@@ -1,4 +1,6 @@
 add_library(SequenceProcessing
+        Classification/RecurrentModelGraphBridge.c
+        Classification/RecurrentModelGraphBridge.h
         Classification/RecurrentNeuralNetworkModel.c
         Classification/RecurrentNeuralNetworkModel.h
         SequenceProcessing.c

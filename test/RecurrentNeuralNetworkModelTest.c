@@ -1,6 +1,7 @@
 #include "Classification/RecurrentNeuralNetworkModel.h"
 
 #include "ArrayList.h"
+#include "Functions/AdditionByConstant.h"
 #include "Functions/Switch.h"
 #include "Initialization/Initialization.h"
 #include "Memory/Memory.h"
@@ -123,6 +124,36 @@ static int test_get_output_value(void) {
     return success;
 }
 
+static int test_local_graph_bridge_wrappers(void) {
+    Recurrent_neural_network_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Recurrent_neural_network_model_ptr model = create_recurrent_neural_network_model(parameter, 2);
+    Computational_node_ptr input = recurrent_neural_network_model_add_class_label_input(model);
+    Addition_by_constant_ptr function = create_addition_by_constant(1.0);
+    Computational_node_ptr child;
+    Tensor_ptr input_tensor;
+    double* values = malloc_(2 * sizeof(double));
+    int shape[2] = {1, 2};
+    Array_list_ptr class_labels;
+    int success;
+    values[0] = 0.1;
+    values[1] = 0.9;
+    input_tensor = create_tensor3(values, shape, 2);
+    set_node_value(input, input_tensor);
+    child = recurrent_neural_network_model_add_edge(model, input, (Function*) function, false);
+    recurrent_neural_network_model_set_output_node(model, child);
+    class_labels = recurrent_neural_network_model_predict(model);
+    success = child != NULL &&
+              class_labels != NULL &&
+              class_labels->size == 1 &&
+              array_list_get_double(class_labels, 0) == 1.0;
+    free_array_list(class_labels, free_);
+    free_recurrent_neural_network_model(model);
+    free_recurrent_neural_network_parameter(parameter);
+    free_(optimizer);
+    return success;
+}
+
 int main(void) {
     if (!test_create_input_tensors()) {
         return 1;
@@ -131,6 +162,9 @@ int main(void) {
         return 1;
     }
     if (!test_get_output_value()) {
+        return 1;
+    }
+    if (!test_local_graph_bridge_wrappers()) {
         return 1;
     }
     return 0;

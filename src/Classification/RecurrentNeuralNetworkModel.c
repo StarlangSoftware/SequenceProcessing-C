@@ -1,5 +1,6 @@
 #include "RecurrentNeuralNetworkModel.h"
 
+#include "RecurrentModelGraphBridge.h"
 #include "Functions/Switch.h"
 
 #include "ArrayList.h"
@@ -13,6 +14,10 @@ static void free_switch_entry(void* data) {
     free_switch_function((Switch_function_ptr) data);
 }
 
+static Array_list_ptr recurrent_output_extractor(const Computational_node* output_node) {
+    return recurrent_neural_network_model_get_output_value(output_node);
+}
+
 Recurrent_neural_network_model_ptr create_recurrent_neural_network_model(Recurrent_neural_network_parameter_ptr parameters,
                                                                          int word_embedding_length) {
     Recurrent_neural_network_model_ptr result = malloc_(sizeof(Recurrent_neural_network_model));
@@ -21,11 +26,12 @@ Recurrent_neural_network_model_ptr create_recurrent_neural_network_model(Recurre
     }
     result->parameters = parameters;
     result->word_embedding_length = word_embedding_length;
-    result->input_nodes = create_array_list();
+    result->graph_bridge = create_recurrent_model_graph_bridge(recurrent_output_extractor);
+    result->input_nodes = recurrent_model_graph_bridge_get_input_nodes(result->graph_bridge);
     result->switches = create_array_list();
-    if (result->input_nodes == NULL || result->switches == NULL) {
-        if (result->input_nodes != NULL) {
-            free_array_list(result->input_nodes, NULL);
+    if (result->graph_bridge == NULL || result->input_nodes == NULL || result->switches == NULL) {
+        if (result->graph_bridge != NULL) {
+            free_recurrent_model_graph_bridge(result->graph_bridge);
         }
         if (result->switches != NULL) {
             free_array_list(result->switches, NULL);
@@ -40,11 +46,11 @@ void free_recurrent_neural_network_model(Recurrent_neural_network_model_ptr mode
     if (model == NULL) {
         return;
     }
-    if (model->input_nodes != NULL) {
-        free_array_list(model->input_nodes, (void (*)(void*)) free_computational_node);
-    }
     if (model->switches != NULL) {
         free_array_list(model->switches, free_switch_entry);
+    }
+    if (model->graph_bridge != NULL) {
+        free_recurrent_model_graph_bridge(model->graph_bridge);
     }
     free_(model);
 }
@@ -55,12 +61,9 @@ Computational_node_ptr recurrent_neural_network_model_add_time_step_input(Recurr
     if (model == NULL) {
         return NULL;
     }
-    input_node = create_computational_node3(false, true);
+    input_node = recurrent_model_graph_bridge_add_input_node(model->graph_bridge, false, true);
     switch_function = create_switch_function();
     if (input_node == NULL || switch_function == NULL) {
-        if (input_node != NULL) {
-            free_computational_node(input_node);
-        }
         if (switch_function != NULL) {
             free_switch_function(switch_function);
         }
@@ -76,12 +79,79 @@ Computational_node_ptr recurrent_neural_network_model_add_class_label_input(Recu
     if (model == NULL) {
         return NULL;
     }
-    class_label_node = create_computational_node3(false, false);
-    if (class_label_node == NULL) {
+    class_label_node = recurrent_model_graph_bridge_add_input_node(model->graph_bridge, false, false);
+    return class_label_node;
+}
+
+Computational_node_ptr recurrent_neural_network_model_add_edge(Recurrent_neural_network_model_ptr model,
+                                                               Computational_node_ptr first,
+                                                               Function* function,
+                                                               bool is_biased) {
+    if (model == NULL) {
         return NULL;
     }
-    array_list_add(model->input_nodes, class_label_node);
-    return class_label_node;
+    return recurrent_model_graph_bridge_add_function_edge(model->graph_bridge, first, function, is_biased);
+}
+
+Computational_node_ptr recurrent_neural_network_model_add_multiplication_edge(Recurrent_neural_network_model_ptr model,
+                                                                              Computational_node_ptr first,
+                                                                              Multiplication_node_ptr second,
+                                                                              bool is_biased) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return recurrent_model_graph_bridge_add_multiplication_edge(model->graph_bridge, first, second, is_biased);
+}
+
+Computational_node_ptr recurrent_neural_network_model_add_hadamard_edge(Recurrent_neural_network_model_ptr model,
+                                                                        Computational_node_ptr first,
+                                                                        Computational_node_ptr second,
+                                                                        bool is_biased) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return recurrent_model_graph_bridge_add_hadamard_edge(model->graph_bridge, first, second, is_biased);
+}
+
+Computational_node_ptr recurrent_neural_network_model_add_addition_edge(Recurrent_neural_network_model_ptr model,
+                                                                        Computational_node_ptr first,
+                                                                        Computational_node_ptr second,
+                                                                        bool is_biased) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return recurrent_model_graph_bridge_add_addition_edge(model->graph_bridge, first, second, is_biased);
+}
+
+Concatenated_node_ptr recurrent_neural_network_model_concat_edges(Recurrent_neural_network_model_ptr model,
+                                                                  Array_list_ptr nodes,
+                                                                  int dimension) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return recurrent_model_graph_bridge_concat_edges(model->graph_bridge, nodes, dimension);
+}
+
+void recurrent_neural_network_model_set_output_node(Recurrent_neural_network_model_ptr model,
+                                                    Computational_node_ptr output_node) {
+    if (model == NULL) {
+        return;
+    }
+    recurrent_model_graph_bridge_set_output_node(model->graph_bridge, output_node);
+}
+
+Array_list_ptr recurrent_neural_network_model_forward(Recurrent_neural_network_model_ptr model) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return recurrent_model_graph_bridge_forward(model->graph_bridge);
+}
+
+Array_list_ptr recurrent_neural_network_model_predict(Recurrent_neural_network_model_ptr model) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return recurrent_model_graph_bridge_predict(model->graph_bridge);
 }
 
 Array_list_ptr recurrent_neural_network_model_create_input_tensors(Recurrent_neural_network_model_ptr model,

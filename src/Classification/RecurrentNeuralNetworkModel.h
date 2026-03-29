@@ -13,6 +13,16 @@ typedef Computational_node* Computational_node_ptr;
 typedef struct recurrent_neural_network_model Recurrent_neural_network_model;
 typedef Recurrent_neural_network_model* Recurrent_neural_network_model_ptr;
 
+typedef struct recurrent_model_graph_bridge Recurrent_model_graph_bridge;
+typedef Recurrent_model_graph_bridge* Recurrent_model_graph_bridge_ptr;
+
+typedef struct function Function;
+typedef struct multiplication_node Multiplication_node;
+typedef Multiplication_node* Multiplication_node_ptr;
+
+typedef struct concatenated_node Concatenated_node;
+typedef Concatenated_node* Concatenated_node_ptr;
+
 struct recurrent_neural_network_model {
     /*
      * Borrowed parameter object. The model does not own or free this pointer.
@@ -23,15 +33,18 @@ struct recurrent_neural_network_model {
     Recurrent_neural_network_parameter_ptr parameters;
 
     /*
+     * Owned local bridge around the sibling computational graph.
+     */
+    Recurrent_model_graph_bridge_ptr graph_bridge;
+
+    /*
      * Borrowed primitive copied from the Java constructor argument.
      */
     int word_embedding_length;
 
     /*
-     * Owned input-node list and node objects for the current helper-layer
-     * slice. This mirrors the Java `inputNodes` role used by
-     * createInputTensors(), but does not yet embed the full inherited
-     * ComputationalGraph-C object.
+     * Borrowed alias of the bridge-managed registered input-node list. Node
+     * ownership belongs to the bridge.
      *
      * Layout assumption for this slice:
      * - entries [0, size - 2] are sequence-step input nodes
@@ -49,8 +62,9 @@ struct recurrent_neural_network_model {
 /*
  * Ownership:
  * - borrowed: `parameters`
- * - owned: model struct, input-node list and node objects, switch list and
- *          switch objects created through this slice's setup helpers
+ * - owned: model struct, graph bridge, switch list and switch objects created
+ *          through this slice's setup helpers
+ * - borrowed alias: `input_nodes`
  */
 Recurrent_neural_network_model_ptr create_recurrent_neural_network_model(Recurrent_neural_network_parameter_ptr parameters,
                                                                          int word_embedding_length);
@@ -68,6 +82,37 @@ Computational_node_ptr recurrent_neural_network_model_add_time_step_input(Recurr
  * model and is borrowed by the caller.
  */
 Computational_node_ptr recurrent_neural_network_model_add_class_label_input(Recurrent_neural_network_model_ptr model);
+
+Computational_node_ptr recurrent_neural_network_model_add_edge(Recurrent_neural_network_model_ptr model,
+                                                               Computational_node_ptr first,
+                                                               Function* function,
+                                                               bool is_biased);
+
+Computational_node_ptr recurrent_neural_network_model_add_multiplication_edge(Recurrent_neural_network_model_ptr model,
+                                                                              Computational_node_ptr first,
+                                                                              Multiplication_node_ptr second,
+                                                                              bool is_biased);
+
+Computational_node_ptr recurrent_neural_network_model_add_hadamard_edge(Recurrent_neural_network_model_ptr model,
+                                                                        Computational_node_ptr first,
+                                                                        Computational_node_ptr second,
+                                                                        bool is_biased);
+
+Computational_node_ptr recurrent_neural_network_model_add_addition_edge(Recurrent_neural_network_model_ptr model,
+                                                                        Computational_node_ptr first,
+                                                                        Computational_node_ptr second,
+                                                                        bool is_biased);
+
+Concatenated_node_ptr recurrent_neural_network_model_concat_edges(Recurrent_neural_network_model_ptr model,
+                                                                  Array_list_ptr nodes,
+                                                                  int dimension);
+
+void recurrent_neural_network_model_set_output_node(Recurrent_neural_network_model_ptr model,
+                                                    Computational_node_ptr output_node);
+
+Array_list_ptr recurrent_neural_network_model_forward(Recurrent_neural_network_model_ptr model);
+
+Array_list_ptr recurrent_neural_network_model_predict(Recurrent_neural_network_model_ptr model);
 
 /*
  * Java helper parity for createInputTensors(Tensor instance).
