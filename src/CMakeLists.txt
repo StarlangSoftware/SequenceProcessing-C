@@ -1,6 +1,10 @@
 add_library(SequenceProcessing
         SequenceProcessing.c
         SequenceProcessing.h
+        Parameters/RecurrentNeuralNetworkParameter.c
+        Parameters/RecurrentNeuralNetworkParameter.h
+        Parameters/TransformerParameter.c
+        Parameters/TransformerParameter.h
         Sequence/LabelledSentence.c
         Sequence/LabelledSentence.h
         Sequence/SequenceCorpus.c
@@ -12,6 +16,7 @@ target_include_directories(SequenceProcessing
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
         ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src
         ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
         ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
@@ -38,9 +43,13 @@ target_link_libraries(SequenceProcessing
 add_executable(SequenceCorpusTest
         ../test/SequenceCorpusTest.c)
 
+add_executable(ParameterSliceTest
+        ../test/ParameterSliceTest.c)
+
 target_include_directories(SequenceCorpusTest
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
         ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src
         ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
         ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
@@ -57,3 +66,18 @@ target_link_libraries(SequenceCorpusTest
         $<$<TARGET_EXISTS:corpus_c::corpus_c>:corpus_c::corpus_c>
         $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>
         $<$<TARGET_EXISTS:regular_c::regular_c>:regular_c::regular_c>)
+
+target_include_directories(ParameterSliceTest
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
+
+target_link_libraries(ParameterSliceTest
+        PRIVATE
+        SequenceProcessing
+        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
+        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
