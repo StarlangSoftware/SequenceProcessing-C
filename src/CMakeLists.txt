@@ -1,4 +1,6 @@
 add_library(SequenceProcessing
+        Classification/RecurrentNeuralNetworkModel.c
+        Classification/RecurrentNeuralNetworkModel.h
         SequenceProcessing.c
         SequenceProcessing.h
         Functions/AdditionByConstant.c
@@ -71,6 +73,9 @@ add_executable(ParameterSliceTest
 add_executable(FunctionSliceTest
         ../test/FunctionSliceTest.c)
 
+add_executable(RecurrentNeuralNetworkModelTest
+        ../test/RecurrentNeuralNetworkModelTest.c)
+
 target_include_directories(SequenceCorpusTest
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -116,6 +121,21 @@ target_include_directories(FunctionSliceTest
         ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
 
 target_link_libraries(FunctionSliceTest
+        PRIVATE
+        SequenceProcessing
+        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
+        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
+
+target_include_directories(RecurrentNeuralNetworkModelTest
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
+
+target_link_libraries(RecurrentNeuralNetworkModelTest
         PRIVATE
         SequenceProcessing
         $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
