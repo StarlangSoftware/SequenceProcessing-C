@@ -1,11 +1,16 @@
 #include "Functions/AdditionByConstant.h"
+#include "Functions/Mask.h"
+#include "Functions/Mean.h"
 #include "Functions/MultiplyByConstant.h"
+#include "Functions/RemoveBias.h"
 #include "Functions/SequenceFunctionEdge.h"
+#include "Functions/Switch.h"
 #include "Functions/Transpose.h"
 
 #include "Memory/Memory.h"
 #include "Node/ComputationalNode.h"
 
+#include <math.h>
 #include <stddef.h>
 
 extern Computational_graph_ptr create_computational_graph(void);
@@ -18,6 +23,18 @@ static Tensor_ptr create_test_tensor_2x2(double a, double b, double c, double d)
     values[1] = b;
     values[2] = c;
     values[3] = d;
+    return create_tensor3(values, shape, 2);
+}
+
+static Tensor_ptr create_test_tensor_2x3(double a, double b, double c, double d, double e, double f) {
+    double* values = malloc_(6 * sizeof(double));
+    int shape[2] = {2, 3};
+    values[0] = a;
+    values[1] = b;
+    values[2] = c;
+    values[3] = d;
+    values[4] = e;
+    values[5] = f;
     return create_tensor3(values, shape, 2);
 }
 
@@ -87,6 +104,114 @@ static int test_transpose(void) {
     return success;
 }
 
+static int test_remove_bias(void) {
+    Remove_bias_ptr function = create_remove_bias();
+    Tensor_ptr input = create_test_tensor_2x2(1.0, 2.0, 3.0, 4.0);
+    Tensor_ptr backward = create_test_tensor_2x2(5.0, 6.0, 7.0, 8.0);
+    Tensor_ptr output = calculate_remove_bias(function, input);
+    Tensor_ptr derivative = derivative_remove_bias(function, input, backward);
+    int success = output != NULL &&
+                  derivative != NULL &&
+                  output->dimensions == 2 &&
+                  output->shape[0] == 1 &&
+                  output->shape[1] == 3 &&
+                  output->data[0] == 1.0 &&
+                  output->data[2] == 3.0 &&
+                  derivative->shape[0] == 1 &&
+                  derivative->shape[1] == 5 &&
+                  derivative->data[0] == 5.0 &&
+                  derivative->data[3] == 8.0 &&
+                  derivative->data[4] == 0.0;
+    free_tensor(input);
+    free_tensor(backward);
+    free_tensor(output);
+    free_tensor(derivative);
+    free_remove_bias(function);
+    return success;
+}
+
+static int test_mean(void) {
+    Mean_function_ptr function = create_mean_function();
+    Tensor_ptr input = create_test_tensor_2x3(1.0, 2.0, 3.0, 4.0, 7.0, 10.0);
+    Tensor_ptr backward = create_test_tensor_2x3(3.0, 6.0, 9.0, 12.0, 15.0, 18.0);
+    Tensor_ptr output = calculate_mean_function(function, input);
+    Tensor_ptr derivative = derivative_mean_function(function, input, backward);
+    int success = output != NULL &&
+                  derivative != NULL &&
+                  output->data[0] == 2.0 &&
+                  output->data[1] == 2.0 &&
+                  output->data[2] == 2.0 &&
+                  output->data[3] == 7.0 &&
+                  output->data[4] == 7.0 &&
+                  output->data[5] == 7.0 &&
+                  derivative->data[0] == 1.0 &&
+                  derivative->data[1] == 2.0 &&
+                  derivative->data[2] == 3.0 &&
+                  derivative->data[3] == 4.0 &&
+                  derivative->data[4] == 5.0 &&
+                  derivative->data[5] == 6.0;
+    free_tensor(input);
+    free_tensor(backward);
+    free_tensor(output);
+    free_tensor(derivative);
+    free_mean_function(function);
+    return success;
+}
+
+static int test_mask(void) {
+    Mask_function_ptr function = create_mask_function();
+    Tensor_ptr input = create_test_tensor_2x2(1.0, 2.0, 3.0, 4.0);
+    Tensor_ptr backward = create_test_tensor_2x2(5.0, 6.0, 7.0, 8.0);
+    Tensor_ptr output = calculate_mask_function(function, input);
+    Tensor_ptr derivative = derivative_mask_function(function, input, backward);
+    int success = output != NULL &&
+                  derivative != NULL &&
+                  output->data[0] == 1.0 &&
+                  isinf(output->data[1]) &&
+                  output->data[1] < 0.0 &&
+                  output->data[2] == 3.0 &&
+                  output->data[3] == 4.0 &&
+                  derivative->data[0] == 5.0 &&
+                  derivative->data[3] == 8.0;
+    free_tensor(input);
+    free_tensor(backward);
+    free_tensor(output);
+    free_tensor(derivative);
+    free_mask_function(function);
+    return success;
+}
+
+static int test_switch(void) {
+    Switch_function_ptr function = create_switch_function();
+    Tensor_ptr input = create_test_tensor_2x2(1.0, 2.0, 3.0, 4.0);
+    Tensor_ptr backward = create_test_tensor_2x2(5.0, 6.0, 7.0, 8.0);
+    Tensor_ptr output_on = calculate_switch_function(function, input);
+    Tensor_ptr derivative_on = derivative_switch_function(function, input, backward);
+    set_switch_turn(function, false);
+    Tensor_ptr output_off = calculate_switch_function(function, input);
+    Tensor_ptr derivative_off = derivative_switch_function(function, input, backward);
+    int success = output_on != NULL &&
+                  derivative_on != NULL &&
+                  output_off != NULL &&
+                  derivative_off != NULL &&
+                  output_on->data[0] == 1.0 &&
+                  output_on->data[3] == 4.0 &&
+                  derivative_on->data[0] == 5.0 &&
+                  derivative_on->data[3] == 8.0 &&
+                  output_off->data[0] == 0.0 &&
+                  output_off->data[3] == 0.0 &&
+                  derivative_off->data[0] == 0.0 &&
+                  derivative_off->data[3] == 0.0;
+    free_tensor(input);
+    free_tensor(backward);
+    free_tensor(output_on);
+    free_tensor(derivative_on);
+    free_tensor(output_off);
+    free_tensor(derivative_off);
+    free_switch_function(function);
+    return success;
+}
+
 static int test_sequence_function_edge(void) {
     Computational_graph_ptr graph = create_computational_graph();
     Computational_node_ptr input = create_computational_node3(false, false);
@@ -111,6 +236,18 @@ int main(void) {
         return 1;
     }
     if (!test_transpose()) {
+        return 1;
+    }
+    if (!test_remove_bias()) {
+        return 1;
+    }
+    if (!test_mean()) {
+        return 1;
+    }
+    if (!test_mask()) {
+        return 1;
+    }
+    if (!test_switch()) {
         return 1;
     }
     if (!test_sequence_function_edge()) {
