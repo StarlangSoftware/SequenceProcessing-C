@@ -1,6 +1,14 @@
 add_library(SequenceProcessing
         SequenceProcessing.c
         SequenceProcessing.h
+        Functions/AdditionByConstant.c
+        Functions/AdditionByConstant.h
+        Functions/MultiplyByConstant.c
+        Functions/MultiplyByConstant.h
+        Functions/SequenceFunctionEdge.c
+        Functions/SequenceFunctionEdge.h
+        Functions/Transpose.c
+        Functions/Transpose.h
         Parameters/RecurrentNeuralNetworkParameter.c
         Parameters/RecurrentNeuralNetworkParameter.h
         Parameters/TransformerParameter.c
@@ -46,6 +54,9 @@ add_executable(SequenceCorpusTest
 add_executable(ParameterSliceTest
         ../test/ParameterSliceTest.c)
 
+add_executable(FunctionSliceTest
+        ../test/FunctionSliceTest.c)
+
 target_include_directories(SequenceCorpusTest
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -76,6 +87,21 @@ target_include_directories(ParameterSliceTest
         ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
 
 target_link_libraries(ParameterSliceTest
+        PRIVATE
+        SequenceProcessing
+        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
+        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
+
+target_include_directories(FunctionSliceTest
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
+
+target_link_libraries(FunctionSliceTest
         PRIVATE
         SequenceProcessing
         $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
