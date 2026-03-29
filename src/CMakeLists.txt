@@ -1,4 +1,6 @@
 add_library(SequenceProcessing
+        Classification/GatedRecurrentUnitModel.c
+        Classification/GatedRecurrentUnitModel.h
         Classification/RecurrentModelGraphBridge.c
         Classification/RecurrentModelGraphBridge.h
         Classification/RecurrentNeuralNetworkModel.c
@@ -78,6 +80,9 @@ add_executable(FunctionSliceTest
 add_executable(RecurrentNeuralNetworkModelTest
         ../test/RecurrentNeuralNetworkModelTest.c)
 
+add_executable(GatedRecurrentUnitModelTest
+        ../test/GatedRecurrentUnitModelTest.c)
+
 target_include_directories(SequenceCorpusTest
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -138,6 +143,21 @@ target_include_directories(RecurrentNeuralNetworkModelTest
         ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
 
 target_link_libraries(RecurrentNeuralNetworkModelTest
+        PRIVATE
+        SequenceProcessing
+        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
+        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
+
+target_include_directories(GatedRecurrentUnitModelTest
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
+
+target_link_libraries(GatedRecurrentUnitModelTest
         PRIVATE
         SequenceProcessing
         $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>

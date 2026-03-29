@@ -69,7 +69,6 @@ Computational_node_ptr recurrent_neural_network_model_add_time_step_input(Recurr
         }
         return NULL;
     }
-    array_list_add(model->input_nodes, input_node);
     array_list_add(model->switches, switch_function);
     return input_node;
 }
