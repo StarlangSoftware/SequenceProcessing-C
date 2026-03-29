@@ -3,6 +3,8 @@ add_library(SequenceProcessing
         SequenceProcessing.h
         Functions/AdditionByConstant.c
         Functions/AdditionByConstant.h
+        Functions/Inverse.c
+        Functions/Inverse.h
         Functions/Mask.c
         Functions/Mask.h
         Functions/Mean.c
@@ -13,10 +15,14 @@ add_library(SequenceProcessing
         Functions/RemoveBias.h
         Functions/SequenceFunctionEdge.c
         Functions/SequenceFunctionEdge.h
+        Functions/SquareRoot.c
+        Functions/SquareRoot.h
         Functions/Switch.c
         Functions/Switch.h
         Functions/Transpose.c
         Functions/Transpose.h
+        Functions/Variance.c
+        Functions/Variance.h
         Parameters/RecurrentNeuralNetworkParameter.c
         Parameters/RecurrentNeuralNetworkParameter.h
         Parameters/TransformerParameter.c
