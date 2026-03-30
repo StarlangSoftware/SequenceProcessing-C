@@ -5,6 +5,9 @@
 #include "Dictionary/VectorizedDictionary.h"
 #include "Dictionary/VectorizedWord.h"
 #include "Memory/Memory.h"
+#include "Node/ComputationalNode.h"
+#include "RecurrentModelGraphBridge.h"
+#include "Vector.h"
 
 #include <float.h>
 #include <math.h>
@@ -20,6 +23,16 @@ struct transformer_model {
      * Borrowed dictionary reference, matching the Java constructor field.
      */
     Vectorized_dictionary_ptr dictionary;
+
+    /*
+     * Owned local graph bridge reused for Transformer input/output shell state.
+     */
+    Recurrent_model_graph_bridge_ptr graph_bridge;
+
+    /*
+     * Borrowed alias of bridge-managed input nodes.
+     */
+    Array_list_ptr input_nodes;
 
     int start_index;
     int end_index;
@@ -43,6 +56,10 @@ static int find_token_index(const Vectorized_dictionary* dictionary, const char*
         }
     }
     return -1;
+}
+
+static Array_list_ptr transformer_output_extractor(const Computational_node* output_node) {
+    return transformer_model_get_output_value(output_node);
 }
 
 static Tensor_ptr create_tensor_from_double_list(const Array_list* values, int row_count, int column_count) {
@@ -75,14 +92,26 @@ Transformer_model_ptr create_transformer_model(Transformer_parameter_ptr paramet
     }
     result->parameters = parameters;
     result->dictionary = dictionary;
+    result->graph_bridge = create_recurrent_model_graph_bridge(transformer_output_extractor);
+    result->input_nodes = recurrent_model_graph_bridge_get_input_nodes(result->graph_bridge);
     result->start_index = find_token_index(dictionary, "<S>");
     result->end_index = find_token_index(dictionary, "</S>");
+    if (result->graph_bridge == NULL || result->input_nodes == NULL) {
+        if (result->graph_bridge != NULL) {
+            free_recurrent_model_graph_bridge(result->graph_bridge);
+        }
+        free_(result);
+        return NULL;
+    }
     return result;
 }
 
 void free_transformer_model(Transformer_model_ptr model) {
     if (model == NULL) {
         return;
+    }
+    if (model->graph_bridge != NULL) {
+        free_recurrent_model_graph_bridge(model->graph_bridge);
     }
     free_(model);
 }
@@ -106,6 +135,13 @@ int transformer_model_get_end_index(const Transformer_model* model) {
         return -1;
     }
     return model->end_index;
+}
+
+Array_list_ptr transformer_model_get_input_nodes(const Transformer_model* model) {
+    if (model == NULL) {
+        return NULL;
+    }
+    return model->input_nodes;
 }
 
 Tensor_ptr transformer_model_positional_encoding(const Transformer_model* model,
@@ -284,4 +320,113 @@ Array_list_ptr transformer_packed_inputs_get_class_labels(const Transformer_pack
         return NULL;
     }
     return packed_inputs->class_labels;
+}
+
+bool transformer_model_set_input_node(const Transformer_model* model,
+                                      int bound,
+                                      const Vector* vector,
+                                      Computational_node_ptr node) {
+    double* data;
+    int shape[2];
+    int old_size = 0;
+    int i;
+    if (model == NULL || vector == NULL || node == NULL || bound <= 0 || vector->size <= 0) {
+        return false;
+    }
+    if (node->value != NULL) {
+        old_size = node->value->total_elements;
+    }
+    data = malloc_((old_size + vector->size) * sizeof(double));
+    if (data == NULL) {
+        return false;
+    }
+    for (i = 0; i < old_size; i++) {
+        data[i] = node->value->data[i];
+    }
+    for (i = 0; i < vector->size; i++) {
+        if (i % 2 == 0) {
+            data[old_size + i] =
+                    get_value(vector, i) + sin((bound + 0.0) / pow(10000.0, (i + 0.0) / vector->size));
+        } else {
+            data[old_size + i] =
+                    get_value(vector, i) + cos((bound + 0.0) / pow(10000.0, (i - 1.0) / vector->size));
+        }
+    }
+    shape[0] = bound;
+    shape[1] = vector->size;
+    set_node_value(node, create_tensor3(data, shape, 2));
+    return true;
+}
+
+bool transformer_model_initialize_graph_inputs(Transformer_model_ptr model) {
+    if (model == NULL || model->graph_bridge == NULL || model->input_nodes == NULL) {
+        return false;
+    }
+    if (model->input_nodes->size == 0) {
+        Computational_node_ptr encoder_input =
+                recurrent_model_graph_bridge_add_input_node(model->graph_bridge, false, true);
+        Computational_node_ptr decoder_input =
+                recurrent_model_graph_bridge_add_input_node(model->graph_bridge, false, true);
+        return encoder_input != NULL && decoder_input != NULL;
+    }
+    return model->input_nodes->size == 2 || model->input_nodes->size == 3;
+}
+
+bool transformer_model_apply_packed_inputs(Transformer_model_ptr model,
+                                           const Transformer_packed_inputs* packed_inputs) {
+    Computational_node_ptr encoder_input;
+    Computational_node_ptr decoder_input;
+    if (model == NULL || packed_inputs == NULL) {
+        return false;
+    }
+    if (!transformer_model_initialize_graph_inputs(model)) {
+        return false;
+    }
+    encoder_input = array_list_get(model->input_nodes, 0);
+    decoder_input = array_list_get(model->input_nodes, 1);
+    if (encoder_input == NULL || decoder_input == NULL ||
+        packed_inputs->encoder_input == NULL || packed_inputs->decoder_input == NULL) {
+        return false;
+    }
+    set_node_value(encoder_input, clone_tensor(packed_inputs->encoder_input));
+    set_node_value(decoder_input, clone_tensor(packed_inputs->decoder_input));
+    return true;
+}
+
+Computational_node_ptr transformer_model_add_class_label_input(Transformer_model_ptr model) {
+    if (model == NULL || model->graph_bridge == NULL || model->input_nodes == NULL) {
+        return NULL;
+    }
+    if (!transformer_model_initialize_graph_inputs(model)) {
+        return NULL;
+    }
+    if (model->input_nodes->size >= 3) {
+        return array_list_get(model->input_nodes, 2);
+    }
+    return recurrent_model_graph_bridge_add_input_node(model->graph_bridge, false, false);
+}
+
+Array_list_ptr transformer_model_get_output_value(const Computational_node* output_node) {
+    Array_list_ptr class_labels;
+    int i, j;
+    if (output_node == NULL || output_node->value == NULL || output_node->value->dimensions != 2) {
+        return NULL;
+    }
+    class_labels = create_array_list();
+    if (class_labels == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < output_node->value->shape[0]; i++) {
+        double max = DBL_MIN;
+        double index = -1.0;
+        for (j = 0; j < output_node->value->shape[1]; j++) {
+            double value = output_node->value->data[(i * output_node->value->shape[1]) + j];
+            if (value > max) {
+                max = value;
+                index = (double) j;
+            }
+        }
+        array_list_add_double(class_labels, index);
+    }
+    return class_labels;
 }

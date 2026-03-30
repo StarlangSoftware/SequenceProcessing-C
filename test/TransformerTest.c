@@ -6,6 +6,7 @@
 #include "Dictionary/VectorizedWord.h"
 #include "Initialization/Initialization.h"
 #include "Memory/Memory.h"
+#include "Node/ComputationalNode.h"
 #include "Optimizer/Optimizer.h"
 
 #include <float.h>
@@ -168,6 +169,93 @@ static int test_transformer_create_packed_inputs_helper(void) {
     return success;
 }
 
+static int test_transformer_graph_input_initialization_and_apply(void) {
+    Transformer_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
+    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    double* values = malloc_(11 * sizeof(double));
+    int shape[1] = {11};
+    Tensor_ptr instance;
+    Transformer_packed_inputs_ptr packed_inputs;
+    Array_list_ptr input_nodes;
+    Computational_node_ptr encoder_input;
+    Computational_node_ptr decoder_input;
+    int success;
+    values[0] = 1.0;
+    values[1] = 2.0;
+    values[2] = 3.0;
+    values[3] = 4.0;
+    values[4] = DBL_MAX;
+    values[5] = 5.0;
+    values[6] = 6.0;
+    values[7] = 0.0;
+    values[8] = 7.0;
+    values[9] = 8.0;
+    values[10] = 1.0;
+    instance = create_tensor3(values, shape, 1);
+    packed_inputs = transformer_model_create_packed_inputs(model, instance, 2);
+    success = transformer_model_initialize_graph_inputs(model) &&
+              transformer_model_apply_packed_inputs(model, packed_inputs);
+    input_nodes = transformer_model_get_input_nodes(model);
+    encoder_input = array_list_get(input_nodes, 0);
+    decoder_input = array_list_get(input_nodes, 1);
+    success = success &&
+              input_nodes != NULL &&
+              input_nodes->size == 2 &&
+              encoder_input != NULL &&
+              decoder_input != NULL &&
+              encoder_input->value != NULL &&
+              decoder_input->value != NULL &&
+              encoder_input->value->shape[0] == 2 &&
+              encoder_input->value->shape[1] == 2 &&
+              decoder_input->value->shape[0] == 2 &&
+              decoder_input->value->shape[1] == 2;
+    free_transformer_packed_inputs(packed_inputs);
+    free_tensor(instance);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_vectorized_dictionary(dictionary);
+    free_(optimizer);
+    return success;
+}
+
+static int test_transformer_set_input_node_and_class_label_slot(void) {
+    Transformer_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
+    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Array_list_ptr input_nodes;
+    Computational_node_ptr decoder_input;
+    Computational_node_ptr class_label_input;
+    double first_values[2] = {0.25, 0.5};
+    double second_values[2] = {0.75, 1.0};
+    Vector_ptr first_vector = create_vector4(first_values, 2);
+    Vector_ptr second_vector = create_vector4(second_values, 2);
+    int success = transformer_model_initialize_graph_inputs(model);
+    input_nodes = transformer_model_get_input_nodes(model);
+    decoder_input = array_list_get(input_nodes, 1);
+    success = success &&
+              transformer_model_set_input_node(model, 1, first_vector, decoder_input) &&
+              transformer_model_set_input_node(model, 2, second_vector, decoder_input);
+    class_label_input = transformer_model_add_class_label_input(model);
+    success = success &&
+              decoder_input != NULL &&
+              decoder_input->value != NULL &&
+              decoder_input->value->shape[0] == 2 &&
+              decoder_input->value->shape[1] == 2 &&
+              decoder_input->value->total_elements == 4 &&
+              class_label_input != NULL &&
+              transformer_model_get_input_nodes(model)->size == 3;
+    free_vector(first_vector);
+    free_vector(second_vector);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_vectorized_dictionary(dictionary);
+    free_(optimizer);
+    return success;
+}
+
 int main(void) {
     if (!test_transformer_constructor_scans_start_and_end_tokens()) {
         return 1;
@@ -179,6 +267,12 @@ int main(void) {
         return 1;
     }
     if (!test_transformer_create_packed_inputs_helper()) {
+        return 1;
+    }
+    if (!test_transformer_graph_input_initialization_and_apply()) {
+        return 1;
+    }
+    if (!test_transformer_set_input_node_and_class_label_slot()) {
         return 1;
     }
     return 0;
