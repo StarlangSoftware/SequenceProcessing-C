@@ -11,6 +11,8 @@ add_library(SequenceProcessing
         Classification/RecurrentModelGraphBridge.h
         Classification/RecurrentNeuralNetworkModel.c
         Classification/RecurrentNeuralNetworkModel.h
+        Classification/Transformer.c
+        Classification/Transformer.h
         SequenceProcessing.c
         SequenceProcessing.h
         Functions/AdditionByConstant.c
@@ -91,6 +93,9 @@ add_executable(GatedRecurrentUnitModelTest
 
 add_executable(LongShortTermMemoryModelTest
         ../test/LongShortTermMemoryModelTest.c)
+
+add_executable(TransformerTest
+        ../test/TransformerTest.c)
 
 target_include_directories(SequenceCorpusTest
         PRIVATE
@@ -186,4 +191,22 @@ target_link_libraries(LongShortTermMemoryModelTest
         SequenceProcessing
         $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
         $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
+
+target_include_directories(TransformerTest
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
+
+target_link_libraries(TransformerTest
+        PRIVATE
+        SequenceProcessing
+        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
+        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:dictionary_c::dictionary_c>:dictionary_c::dictionary_c>
         $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
