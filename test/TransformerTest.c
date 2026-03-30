@@ -8,6 +8,8 @@
 #include "Memory/Memory.h"
 #include "Optimizer/Optimizer.h"
 
+#include <float.h>
+
 static Transformer_parameter_ptr create_test_parameter(void) {
     Array_list_ptr empty_ints = create_array_list();
     Array_list_ptr empty_functions = create_array_list();
@@ -86,11 +88,97 @@ static int test_transformer_constructor_handles_missing_tokens(void) {
     return success;
 }
 
+static int test_transformer_positional_encoding_helper(void) {
+    Transformer_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
+    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    double* values = malloc_(4 * sizeof(double));
+    int shape[2] = {2, 2};
+    Tensor_ptr tensor;
+    Tensor_ptr encoded;
+    int success;
+    values[0] = 1.0;
+    values[1] = 2.0;
+    values[2] = 3.0;
+    values[3] = 4.0;
+    tensor = create_tensor3(values, shape, 2);
+    encoded = transformer_model_positional_encoding(model, tensor, 2);
+    success = encoded != NULL &&
+              encoded->shape[0] == 2 &&
+              encoded->shape[1] == 2 &&
+              encoded->data[0] > 1.0 &&
+              encoded->data[1] > 2.0 &&
+              encoded->data[2] > 3.0;
+    free_tensor(encoded);
+    free_tensor(tensor);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_vectorized_dictionary(dictionary);
+    free_(optimizer);
+    return success;
+}
+
+static int test_transformer_create_packed_inputs_helper(void) {
+    Transformer_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
+    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    double* values = malloc_(11 * sizeof(double));
+    int shape[1] = {11};
+    Tensor_ptr instance;
+    Transformer_packed_inputs_ptr packed_inputs;
+    Array_list_ptr class_labels;
+    const Tensor* encoder_input;
+    const Tensor* decoder_input;
+    int success;
+    values[0] = 1.0;
+    values[1] = 2.0;
+    values[2] = 3.0;
+    values[3] = 4.0;
+    values[4] = DBL_MAX;
+    values[5] = 5.0;
+    values[6] = 6.0;
+    values[7] = 0.0;
+    values[8] = 7.0;
+    values[9] = 8.0;
+    values[10] = 1.0;
+    instance = create_tensor3(values, shape, 1);
+    packed_inputs = transformer_model_create_packed_inputs(model, instance, 2);
+    class_labels = transformer_packed_inputs_get_class_labels(packed_inputs);
+    encoder_input = transformer_packed_inputs_get_encoder_input(packed_inputs);
+    decoder_input = transformer_packed_inputs_get_decoder_input(packed_inputs);
+    success = packed_inputs != NULL &&
+              encoder_input != NULL &&
+              decoder_input != NULL &&
+              class_labels != NULL &&
+              encoder_input->shape[0] == 2 &&
+              encoder_input->shape[1] == 2 &&
+              decoder_input->shape[0] == 2 &&
+              decoder_input->shape[1] == 2 &&
+              class_labels->size == 2 &&
+              array_list_get_int(class_labels, 0) == 0 &&
+              array_list_get_int(class_labels, 1) == 1;
+    free_transformer_packed_inputs(packed_inputs);
+    free_tensor(instance);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_vectorized_dictionary(dictionary);
+    free_(optimizer);
+    return success;
+}
+
 int main(void) {
     if (!test_transformer_constructor_scans_start_and_end_tokens()) {
         return 1;
     }
     if (!test_transformer_constructor_handles_missing_tokens()) {
+        return 1;
+    }
+    if (!test_transformer_positional_encoding_helper()) {
+        return 1;
+    }
+    if (!test_transformer_create_packed_inputs_helper()) {
         return 1;
     }
     return 0;
