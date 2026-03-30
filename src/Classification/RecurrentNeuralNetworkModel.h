@@ -62,6 +62,16 @@ struct recurrent_neural_network_model {
      * non-class-label input nodes only.
      */
     Array_list_ptr switches;
+
+    /*
+     * Lifecycle lock for recurrent graph construction.
+     *
+     * The current local recurrent model slice supports building the graph once
+     * on a fresh instance. After the first GRU/LSTM graph-build attempt, later
+     * `train(...)` calls are explicitly rejected instead of attempting an
+     * ungrounded rebuild/reset flow.
+     */
+    bool graph_initialized;
 };
 
 /*

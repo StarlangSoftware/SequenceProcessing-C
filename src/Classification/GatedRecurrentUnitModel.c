@@ -102,14 +102,20 @@ bool gated_recurrent_unit_model_train(Gated_recurrent_unit_model_ptr model, Arra
     if (base_model == NULL || parameters == NULL) {
         return false;
     }
+    if (base_model->graph_initialized) {
+        return false;
+    }
     if (base_model->input_nodes == NULL || base_model->switches == NULL ||
         base_model->input_nodes->size != 0 || base_model->switches->size != 0) {
         /*
-         * This minimal slice supports building the recurrent graph once on a
-         * fresh model instance, mirroring the current constructor->train flow.
+         * The current slice only supports graph construction on a fresh model.
+         * Lock the lifecycle after the first attempt so later calls fail
+         * explicitly instead of trying to recover partially built state.
          */
+        base_model->graph_initialized = true;
         return false;
     }
+    base_model->graph_initialized = true;
     random = create_java_random_compat(parameters->neural_network_parameter.seed);
     if (random == NULL) {
         return false;

@@ -37,6 +37,10 @@ Recurrent_neural_network_model_ptr gated_recurrent_unit_model_get_base(Gated_rec
  * class-label-index backprop. Multi-input loss-node forward parity remains
  * deferred.
  *
+ * Repeated `train(...)` calls on the same GRU instance are intentionally
+ * rejected in this slice. The recurrent graph is built once on a fresh model
+ * and then treated as owned model state until destruction.
+ *
  * Ownership:
  * - borrowed: `train_set`
  */

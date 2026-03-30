@@ -88,6 +88,7 @@ Recurrent_neural_network_model_ptr create_recurrent_neural_network_model(Recurre
     result->graph_bridge = create_recurrent_model_graph_bridge(recurrent_output_extractor);
     result->input_nodes = recurrent_model_graph_bridge_get_input_nodes(result->graph_bridge);
     result->switches = create_array_list();
+    result->graph_initialized = false;
     if (result->graph_bridge == NULL || result->input_nodes == NULL || result->switches == NULL) {
         if (result->graph_bridge != NULL) {
             free_recurrent_model_graph_bridge(result->graph_bridge);
