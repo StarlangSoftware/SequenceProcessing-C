@@ -5,6 +5,8 @@ add_library(SequenceProcessing
         Classification/GatedRecurrentUnitModel.h
         Classification/JavaRandomCompat.c
         Classification/JavaRandomCompat.h
+        Classification/LongShortTermMemoryModel.c
+        Classification/LongShortTermMemoryModel.h
         Classification/RecurrentModelGraphBridge.c
         Classification/RecurrentModelGraphBridge.h
         Classification/RecurrentNeuralNetworkModel.c
@@ -87,6 +89,9 @@ add_executable(RecurrentNeuralNetworkModelTest
 add_executable(GatedRecurrentUnitModelTest
         ../test/GatedRecurrentUnitModelTest.c)
 
+add_executable(LongShortTermMemoryModelTest
+        ../test/LongShortTermMemoryModelTest.c)
+
 target_include_directories(SequenceCorpusTest
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -162,6 +167,21 @@ target_include_directories(GatedRecurrentUnitModelTest
         ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
 
 target_link_libraries(GatedRecurrentUnitModelTest
+        PRIVATE
+        SequenceProcessing
+        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
+        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
+        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
+
+target_include_directories(LongShortTermMemoryModelTest
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
+
+target_link_libraries(LongShortTermMemoryModelTest
         PRIVATE
         SequenceProcessing
         $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
