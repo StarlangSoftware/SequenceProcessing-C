@@ -8,6 +8,7 @@
 #include "Memory/Memory.h"
 #include "Node/ComputationalNode.h"
 #include "Optimizer/Optimizer.h"
+#include "Optimizer/StochasticGradientDescent.h"
 
 #include <float.h>
 
@@ -37,6 +38,49 @@ static Transformer_parameter_ptr create_test_parameter(void) {
     free_array_list(empty_ints, free_);
     free_array_list(empty_functions, NULL);
     free_array_list(empty_doubles, free_);
+    return parameter;
+}
+
+static Transformer_parameter_ptr create_trainable_test_parameter(Optimizer_ptr optimizer) {
+    Array_list_ptr empty_ints = create_array_list();
+    Array_list_ptr empty_functions = create_array_list();
+    Array_list_ptr gamma_input = create_array_list();
+    Array_list_ptr gamma_output = create_array_list();
+    Array_list_ptr beta_input = create_array_list();
+    Array_list_ptr beta_output = create_array_list();
+    Transformer_parameter_ptr parameter;
+    array_list_add_double(gamma_input, 1.0);
+    array_list_add_double(gamma_input, 1.0);
+    array_list_add_double(gamma_output, 1.0);
+    array_list_add_double(gamma_output, 1.0);
+    array_list_add_double(beta_input, 0.0);
+    array_list_add_double(beta_input, 0.0);
+    array_list_add_double(beta_output, 0.0);
+    array_list_add_double(beta_output, 0.0);
+    parameter = create_transformer_parameter(
+            13,
+            2,
+            optimizer,
+            Random,
+            NULL,
+            1,
+            1,
+            3,
+            1e-8,
+            empty_ints,
+            empty_ints,
+            empty_functions,
+            empty_functions,
+            gamma_input,
+            gamma_output,
+            beta_input,
+            beta_output);
+    free_array_list(empty_ints, free_);
+    free_array_list(empty_functions, NULL);
+    free_array_list(gamma_input, free_);
+    free_array_list(gamma_output, free_);
+    free_array_list(beta_input, free_);
+    free_array_list(beta_output, free_);
     return parameter;
 }
 
@@ -256,6 +300,69 @@ static int test_transformer_set_input_node_and_class_label_slot(void) {
     return success;
 }
 
+static int test_transformer_build_graph_stage(void) {
+    Optimizer_ptr optimizer = create_stochastic_gradient(0.1, 0.5);
+    Transformer_parameter_ptr parameter = create_trainable_test_parameter(optimizer);
+    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
+    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Array_list_ptr input_nodes;
+    /*
+     * This validates only the staged local graph shell: graph claim plus the
+     * three expected input slots. It does not assert Java loss-node forward
+     * parity.
+     */
+    int success = transformer_model_build_graph(model);
+    input_nodes = transformer_model_get_input_nodes(model);
+    success = success &&
+              transformer_model_is_graph_initialized(model) &&
+              input_nodes != NULL &&
+              input_nodes->size == 3;
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_vectorized_dictionary(dictionary);
+    free_(optimizer);
+    return success;
+}
+
+static int test_transformer_train_stage(void) {
+    Optimizer_ptr optimizer = create_stochastic_gradient(0.1, 0.5);
+    Transformer_parameter_ptr parameter = create_trainable_test_parameter(optimizer);
+    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
+    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Array_list_ptr train_set = create_array_list();
+    double* values = malloc_(9 * sizeof(double));
+    int shape[1] = {9};
+    Tensor_ptr instance = create_tensor3(values, shape, 1);
+    int success;
+    values[0] = 0.1;
+    values[1] = 0.2;
+    values[2] = DBL_MAX;
+    values[3] = 0.3;
+    values[4] = 0.0;
+    values[5] = 0.4;
+    values[6] = 1.0;
+    values[7] = 0.5;
+    values[8] = 2.0;
+    array_list_add(train_set, instance);
+    /*
+     * This validates only the staged training compromise already implemented in
+     * this repo: build-on-demand, packed inputs, class-index backprop, and
+     * epoch-level learning-rate decay. It does not claim Java `test(...)`
+     * parity or loss-node forward-value parity.
+     */
+    success = transformer_model_train(model, train_set) &&
+              transformer_model_is_graph_initialized(model) &&
+              transformer_model_get_input_nodes(model) != NULL &&
+              transformer_model_get_input_nodes(model)->size == 3 &&
+              optimizer->learning_rate == 0.025;
+    free_array_list(train_set, (void (*)(void*)) free_tensor);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_vectorized_dictionary(dictionary);
+    free_(optimizer);
+    return success;
+}
+
 int main(void) {
     if (!test_transformer_constructor_scans_start_and_end_tokens()) {
         return 1;
@@ -273,6 +380,12 @@ int main(void) {
         return 1;
     }
     if (!test_transformer_set_input_node_and_class_label_slot()) {
+        return 1;
+    }
+    if (!test_transformer_build_graph_stage()) {
+        return 1;
+    }
+    if (!test_transformer_train_stage()) {
         return 1;
     }
     return 0;
