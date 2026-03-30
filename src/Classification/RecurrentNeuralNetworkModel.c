@@ -1,13 +1,18 @@
 #include "RecurrentNeuralNetworkModel.h"
 
+#include "JavaRandomCompat.h"
 #include "RecurrentModelGraphBridge.h"
 #include "Functions/Switch.h"
 
 #include "ArrayList.h"
+#include "Initialization/Initialization.h"
 #include "Memory/Memory.h"
 #include "Node/ComputationalNode.h"
+#include "Node/MultiplicationNode.h"
+#include "Optimizer/Optimizer.h"
 
 #include <float.h>
+#include <math.h>
 #include <stddef.h>
 
 static void free_switch_entry(void* data) {
@@ -16,6 +21,60 @@ static void free_switch_entry(void* data) {
 
 static Array_list_ptr recurrent_output_extractor(const Computational_node* output_node) {
     return recurrent_neural_network_model_get_output_value(output_node);
+}
+
+static Tensor_ptr create_class_label_tensor(const Array_list* class_labels, int class_label_size) {
+    double* values;
+    int shape[2];
+    int i, j;
+    if (class_labels == NULL || class_label_size <= 0) {
+        return NULL;
+    }
+    values = malloc_(class_labels->size * class_label_size * sizeof(double));
+    if (values == NULL && class_labels->size * class_label_size > 0) {
+        return NULL;
+    }
+    for (i = 0; i < class_labels->size; i++) {
+        int class_label = array_list_get_int(class_labels, i);
+        for (j = 0; j < class_label_size; j++) {
+            values[(i * class_label_size) + j] = (j == class_label) ? 1.0 : 0.0;
+        }
+    }
+    shape[0] = class_labels->size;
+    shape[1] = class_label_size;
+    return create_tensor3(values, shape, 2);
+}
+
+static int* create_class_label_index_array(const Array_list* class_labels) {
+    int* result;
+    int i;
+    if (class_labels == NULL) {
+        return NULL;
+    }
+    result = malloc_(class_labels->size * sizeof(int));
+    if (result == NULL && class_labels->size > 0) {
+        return NULL;
+    }
+    for (i = 0; i < class_labels->size; i++) {
+        result[i] = array_list_get_int(class_labels, i);
+    }
+    return result;
+}
+
+static bool shuffle_train_set_like_java(Array_list_ptr train_set, Java_random_compat_ptr random) {
+    int j;
+    if (train_set == NULL || random == NULL) {
+        return false;
+    }
+    for (j = 0; j < train_set->size; j++) {
+        int i1;
+        int i2;
+        if (!java_random_compat_shuffle_pair_indices(random, train_set->size, &i1, &i2)) {
+            return false;
+        }
+        array_list_swap(train_set, i1, i2);
+    }
+    return true;
 }
 
 Recurrent_neural_network_model_ptr create_recurrent_neural_network_model(Recurrent_neural_network_parameter_ptr parameters,
@@ -151,6 +210,99 @@ Array_list_ptr recurrent_neural_network_model_predict(Recurrent_neural_network_m
         return NULL;
     }
     return recurrent_model_graph_bridge_predict(model->graph_bridge);
+}
+
+Multiplication_node_ptr recurrent_neural_network_model_create_weight_node(Recurrent_neural_network_model_ptr model,
+                                                                          int row,
+                                                                          int column,
+                                                                          Java_random_compat_ptr random) {
+    double* values;
+    int shape[2];
+    int i;
+    if (model == NULL || model->parameters == NULL || random == NULL || row <= 0 || column <= 0) {
+        return NULL;
+    }
+    values = malloc_(row * column * sizeof(double));
+    if (values == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < row * column; i++) {
+        double random_value = java_random_compat_next_double(random);
+        switch (model->parameters->neural_network_parameter.initialization) {
+            case He:
+                values[i] = ((sqrt(6.0 / column) + sqrt(6.0 / row)) * random_value) - sqrt(6.0 / row);
+                break;
+            case Uniform:
+                values[i] = (2.0 * random_value - 1.0) * sqrt(6.0 / (row + column));
+                break;
+            case Random:
+            default:
+                values[i] = -0.01 + (0.02 * random_value);
+                break;
+        }
+    }
+    shape[0] = row;
+    shape[1] = column;
+    return create_multiplication_node5(create_tensor3(values, shape, 2));
+}
+
+bool recurrent_neural_network_model_train_with_random(Recurrent_neural_network_model_ptr model,
+                                                      Array_list_ptr train_set,
+                                                      Java_random_compat_ptr random) {
+    int epoch;
+    Computational_node_ptr class_label_node;
+    Optimizer_ptr optimizer;
+    if (model == NULL || model->parameters == NULL || train_set == NULL || random == NULL) {
+        return false;
+    }
+    if (model->input_nodes == NULL || model->input_nodes->size < 1) {
+        return false;
+    }
+    class_label_node = array_list_get(model->input_nodes, model->input_nodes->size - 1);
+    optimizer = model->parameters->neural_network_parameter.optimizer;
+    if (class_label_node == NULL || optimizer == NULL) {
+        return false;
+    }
+    for (epoch = 0; epoch < model->parameters->neural_network_parameter.epoch; epoch++) {
+        int instance_index;
+        if (!shuffle_train_set_like_java(train_set, random)) {
+            return false;
+        }
+        for (instance_index = 0; instance_index < train_set->size; instance_index++) {
+            Tensor_ptr instance = array_list_get(train_set, instance_index);
+            Array_list_ptr class_labels = recurrent_neural_network_model_create_input_tensors(model, instance);
+            Tensor_ptr class_label_tensor;
+            int* class_label_index;
+            Array_list_ptr predictions;
+            if (class_labels == NULL) {
+                return false;
+            }
+            class_label_tensor = create_class_label_tensor(
+                    class_labels,
+                    recurrent_neural_network_parameter_get_class_label_size(model->parameters));
+            if (class_label_tensor == NULL) {
+                free_array_list(class_labels, free_);
+                return false;
+            }
+            set_node_value(class_label_node, class_label_tensor);
+            predictions = recurrent_neural_network_model_forward(model);
+            if (predictions == NULL) {
+                free_array_list(class_labels, free_);
+                return false;
+            }
+            free_array_list(predictions, free_);
+            class_label_index = create_class_label_index_array(class_labels);
+            if (class_label_index == NULL && class_labels->size > 0) {
+                free_array_list(class_labels, free_);
+                return false;
+            }
+            recurrent_model_graph_bridge_back_propagation(model->graph_bridge, optimizer, class_label_index);
+            free_(class_label_index);
+            free_array_list(class_labels, free_);
+        }
+        set_learning_rate(optimizer);
+    }
+    return true;
 }
 
 Array_list_ptr recurrent_neural_network_model_create_input_tensors(Recurrent_neural_network_model_ptr model,

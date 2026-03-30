@@ -53,6 +53,7 @@ extern Computational_node_ptr add_addition_edge(Computational_graph_ptr graph,
 extern Concatenated_node_ptr concat_edges(Computational_graph_ptr graph, Array_list_ptr nodes, int dimension);
 extern Array_list_ptr forward_calculation(Computational_graph_ptr graph);
 extern Array_list_ptr predict_by_computational_graph(Computational_graph_ptr graph);
+extern void back_propagation(Computational_graph_ptr graph, Optimizer_ptr optimizer, const int* class_label_index);
 
 Recurrent_model_graph_bridge_ptr create_recurrent_model_graph_bridge(Recurrent_output_extractor output_extractor) {
     Recurrent_model_graph_bridge_ptr result = malloc_(sizeof(Recurrent_model_graph_bridge));
@@ -199,4 +200,13 @@ Array_list_ptr recurrent_model_graph_bridge_predict(Recurrent_model_graph_bridge
         return NULL;
     }
     return predict_by_computational_graph(bridge->graph);
+}
+
+void recurrent_model_graph_bridge_back_propagation(Recurrent_model_graph_bridge_ptr bridge,
+                                                   Optimizer_ptr optimizer,
+                                                   const int* class_label_index) {
+    if (bridge == NULL || bridge->graph == NULL || optimizer == NULL || class_label_index == NULL) {
+        return;
+    }
+    back_propagation(bridge->graph, optimizer, class_label_index);
 }

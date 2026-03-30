@@ -4,6 +4,8 @@
 #include "Parameters/RecurrentNeuralNetworkParameter.h"
 #include "Tensor.h"
 
+#include <stdbool.h>
+
 typedef struct array_list Array_list;
 typedef Array_list* Array_list_ptr;
 
@@ -22,6 +24,9 @@ typedef Multiplication_node* Multiplication_node_ptr;
 
 typedef struct concatenated_node Concatenated_node;
 typedef Concatenated_node* Concatenated_node_ptr;
+
+typedef struct java_random_compat Java_random_compat;
+typedef Java_random_compat* Java_random_compat_ptr;
 
 struct recurrent_neural_network_model {
     /*
@@ -113,6 +118,32 @@ void recurrent_neural_network_model_set_output_node(Recurrent_neural_network_mod
 Array_list_ptr recurrent_neural_network_model_forward(Recurrent_neural_network_model_ptr model);
 
 Array_list_ptr recurrent_neural_network_model_predict(Recurrent_neural_network_model_ptr model);
+
+/*
+ * Creates an owned learnable weight node using the Java initialization formula
+ * selected by `parameters->initialization` and an evolving Java-compatible RNG.
+ *
+ * Ownership:
+ * - caller owns the returned node until it is attached into the graph
+ */
+Multiplication_node_ptr recurrent_neural_network_model_create_weight_node(Recurrent_neural_network_model_ptr model,
+                                                                          int row,
+                                                                          int column,
+                                                                          Java_random_compat_ptr random);
+
+/*
+ * Shared recurrent training loop used by GRU/LSTM-style subclasses.
+ *
+ * This intentionally follows the class-label-index-seeded backprop path rather
+ * than relying on a multi-input loss node. Loss-node forward-value parity
+ * remains deferred.
+ *
+ * Ownership:
+ * - borrowed: `train_set`, `random`
+ */
+bool recurrent_neural_network_model_train_with_random(Recurrent_neural_network_model_ptr model,
+                                                      Array_list_ptr train_set,
+                                                      Java_random_compat_ptr random);
 
 /*
  * Java helper parity for createInputTensors(Tensor instance).

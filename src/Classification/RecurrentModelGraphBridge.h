@@ -20,6 +20,9 @@ typedef Multiplication_node* Multiplication_node_ptr;
 typedef struct concatenated_node Concatenated_node;
 typedef Concatenated_node* Concatenated_node_ptr;
 
+typedef struct optimizer Optimizer;
+typedef Optimizer* Optimizer_ptr;
+
 typedef struct recurrent_model_graph_bridge Recurrent_model_graph_bridge;
 typedef Recurrent_model_graph_bridge* Recurrent_model_graph_bridge_ptr;
 
@@ -81,5 +84,9 @@ void recurrent_model_graph_bridge_set_output_node(Recurrent_model_graph_bridge_p
 Array_list_ptr recurrent_model_graph_bridge_forward(Recurrent_model_graph_bridge_ptr bridge);
 
 Array_list_ptr recurrent_model_graph_bridge_predict(Recurrent_model_graph_bridge_ptr bridge);
+
+void recurrent_model_graph_bridge_back_propagation(Recurrent_model_graph_bridge_ptr bridge,
+                                                   Optimizer_ptr optimizer,
+                                                   const int* class_label_index);
 
 #endif

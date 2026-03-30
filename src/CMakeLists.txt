@@ -1,6 +1,10 @@
 add_library(SequenceProcessing
+        Classification/BorrowedFunctionProxy.c
+        Classification/BorrowedFunctionProxy.h
         Classification/GatedRecurrentUnitModel.c
         Classification/GatedRecurrentUnitModel.h
+        Classification/JavaRandomCompat.c
+        Classification/JavaRandomCompat.h
         Classification/RecurrentModelGraphBridge.c
         Classification/RecurrentModelGraphBridge.h
         Classification/RecurrentNeuralNetworkModel.c

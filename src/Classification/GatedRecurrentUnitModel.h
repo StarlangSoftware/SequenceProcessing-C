@@ -3,6 +3,8 @@
 
 #include "Classification/RecurrentNeuralNetworkModel.h"
 
+#include <stdbool.h>
+
 typedef struct gated_recurrent_unit_model Gated_recurrent_unit_model;
 typedef Gated_recurrent_unit_model* Gated_recurrent_unit_model_ptr;
 
@@ -29,5 +31,15 @@ void free_gated_recurrent_unit_model(Gated_recurrent_unit_model_ptr model);
  * can reuse the shared recurrent/model bridge.
  */
 Recurrent_neural_network_model_ptr gated_recurrent_unit_model_get_base(Gated_recurrent_unit_model_ptr model);
+
+/*
+ * Local GRU train port using the shared recurrent training bridge and
+ * class-label-index backprop. Multi-input loss-node forward parity remains
+ * deferred.
+ *
+ * Ownership:
+ * - borrowed: `train_set`
+ */
+bool gated_recurrent_unit_model_train(Gated_recurrent_unit_model_ptr model, Array_list_ptr train_set);
 
 #endif
