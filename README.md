@@ -1,42 +1,54 @@
 # SequenceProcessing-C
 
-Scaffold only.
+C port of `SequenceProcessing`, staged against local sibling C repos in this
+workspace.
 
-This repository currently contains the initial project layout for a future C port of `SequenceProcessing`.
-No translation of Java logic has been implemented yet.
+## Local Build Strategy
 
-## Local Dependency Wiring
+`SequenceProcessing-C` now builds against the local sibling source trees rather
+than requiring preinstalled CMake packages:
 
-The current `SequenceProcessing-C` build is wired to local sibling repo headers for the first sequence slice only:
+- `../ComputationalGraph-C`
+- `../Corpus-C`
+- `../Dictionary-C`
+- `../Math-C`
+- `../Util-C`
+- `../DataStructure-C`
+- `../Regular-C`
 
-- `../Corpus-C/src`
-- `../Dictionary-C/src`
-- `../Dictionary-C/src/Dictionary`
-- `../Math-C/src`
-- `../Util-C/src`
-- `../DataStructure-C/src`
+The CMake build defines private local libraries from those source trees and
+links `SequenceProcessing` against them. This is the intended local workspace
+configuration path.
 
-The current sequence implementation uses real sibling headers in `.c` files while keeping public `SequenceProcessing-C` headers on forward declarations.
+## Local Compatibility Notes
 
-## Current Sequence Slice Dependency Chain
+- `src/Performance/ClassificationPerformance.h` is a minimal local compatibility
+  declaration so `ComputationalGraph-C` public headers compile without
+  `Classification-C` in this workspace.
+- `SequenceProcessing-C` does not implement `ClassificationPerformance`
+  behavior locally.
+- Feature macros `_DEFAULT_SOURCE` and `_POSIX_C_SOURCE=200809L` are enabled so
+  libc APIs such as `strtok_r`, `mkstemp`, `fdopen`, `random`, and `srandom`
+  are declared during real builds.
 
-The currently ported sequence files compile at header level through this chain:
+## Test Status
 
-- `LabelledSentence.c`
-  - `Sentence.h` from `Corpus-C`
-  - `Sentence.h` depends on `Dictionary/Word.h`
-  - `Word.h` depends on `StringUtils.h` from `Util-C`
-  - both `Sentence.h` and `StringUtils.h` depend on `ArrayList.h` from `DataStructure-C`
+Currently runnable in local manual builds:
 
-- `LabelledVectorizedWord.c`
-  - `VectorizedWord.h` from `Dictionary-C`
-  - `VectorizedWord.h` depends on `Vector.h` from `Math-C`
-  - `VectorizedWord.h` also depends on `Word.h` from `Dictionary-C`
-  - `Word.h` depends on `StringUtils.h` from `Util-C`
-  - `Vector.h` and `StringUtils.h` depend on `ArrayList.h` from `DataStructure-C`
+- `SequenceCorpusTest`
+- `ParameterSliceTest`
+- `FunctionSliceTest`
+- `RecurrentNeuralNetworkModelTest`
 
-## Current Limitation
+Currently compile-only in this repo:
 
-For the current sequence slice, adding `DataStructure-C` resolves the immediate missing-header problem and the two `.c` files now compile cleanly in syntax-only checks with the configured include roots.
+- `GatedRecurrentUnitModelTest`
+- `LongShortTermMemoryModelTest`
+- `TransformerTest`
 
-The next likely external dependency for subsequent ports is `Regular-C`, because `Corpus-C` declares `find_package(regular_c REQUIRED)` at the project level. That package is not required by the currently ported sequence files, but it may become relevant once `SequenceProcessing-C` starts building against broader `Corpus-C` functionality such as `SequenceCorpus`.
+Those model-layer tests are intentionally not registered with `ctest` yet
+because their runtime paths still cross upstream sibling-library issues outside
+`SequenceProcessing-C`.
+
+See [PORT_STATUS.md](/home/cengiz/dev/ozu/SequenceProcessing-C/PORT_STATUS.md)
+for the current port and blocker summary.

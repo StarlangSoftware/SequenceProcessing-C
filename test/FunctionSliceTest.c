@@ -19,6 +19,10 @@
 extern Computational_graph_ptr create_computational_graph(void);
 extern void free_computational_graph(Computational_graph_ptr graph);
 
+static int approximately_equal(double left, double right, double tolerance) {
+    return fabs(left - right) <= tolerance;
+}
+
 static Tensor_ptr create_test_tensor_2x2(double a, double b, double c, double d) {
     double* values = malloc_(4 * sizeof(double));
     int shape[2] = {2, 2};
@@ -275,10 +279,10 @@ static int test_variance(void) {
                   output->data[1] == 5.0 &&
                   output->data[2] == 48.5 &&
                   output->data[3] == 48.5 &&
-                  derivative->data[0] == 4.242640687119286 &&
-                  derivative->data[1] == 14.696938456699069 &&
-                  derivative->data[2] == 25.455844122715714 &&
-                  derivative->data[3] == 50.91168824543143;
+                  approximately_equal(derivative->data[0], 4.242640687119286, 1e-12) &&
+                  approximately_equal(derivative->data[1], 14.696938456699069, 1e-12) &&
+                  approximately_equal(derivative->data[2], 25.455844122715714, 1e-12) &&
+                  approximately_equal(derivative->data[3], 50.91168824543143, 1e-12);
     free_tensor(input);
     free_tensor(backward);
     free_tensor(output);

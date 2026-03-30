@@ -1,3 +1,115 @@
+set(SEQUENCE_PROCESSING_LOCAL_INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SEQUENCE_PROCESSING_C_LOCAL_COMPUTATIONAL_GRAPH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_REGULAR_ROOT}/src)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_DATA_STRUCTURE_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src/*.c)
+add_library(sequence_processing_data_structure STATIC ${SEQUENCE_PROCESSING_LOCAL_DATA_STRUCTURE_SOURCES})
+target_include_directories(sequence_processing_data_structure
+        PUBLIC
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_UTIL_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src/*.c)
+add_library(sequence_processing_util STATIC ${SEQUENCE_PROCESSING_LOCAL_UTIL_SOURCES})
+target_include_directories(sequence_processing_util
+        PUBLIC
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+target_link_libraries(sequence_processing_util
+        PUBLIC
+        sequence_processing_data_structure)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_MATH_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src/*.c)
+add_library(sequence_processing_math STATIC ${SEQUENCE_PROCESSING_LOCAL_MATH_SOURCES})
+target_include_directories(sequence_processing_math
+        PUBLIC
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+target_link_libraries(sequence_processing_math
+        PUBLIC
+        sequence_processing_util
+        sequence_processing_data_structure
+        m)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_DICTIONARY_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/*.c)
+add_library(sequence_processing_dictionary STATIC ${SEQUENCE_PROCESSING_LOCAL_DICTIONARY_SOURCES})
+target_include_directories(sequence_processing_dictionary
+        PUBLIC
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+target_link_libraries(sequence_processing_dictionary
+        PUBLIC
+        sequence_processing_math
+        sequence_processing_data_structure
+        m)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_REGULAR_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_REGULAR_ROOT}/src/*.c)
+add_library(sequence_processing_regular STATIC ${SEQUENCE_PROCESSING_LOCAL_REGULAR_SOURCES})
+target_include_directories(sequence_processing_regular
+        PUBLIC
+        ${SEQUENCE_PROCESSING_C_LOCAL_REGULAR_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+target_link_libraries(sequence_processing_regular
+        PUBLIC
+        sequence_processing_dictionary)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_CORPUS_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src/*.c)
+add_library(sequence_processing_corpus STATIC ${SEQUENCE_PROCESSING_LOCAL_CORPUS_SOURCES})
+target_include_directories(sequence_processing_corpus
+        PUBLIC
+        ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_REGULAR_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+target_link_libraries(sequence_processing_corpus
+        PUBLIC
+        sequence_processing_regular)
+
+file(GLOB_RECURSE SEQUENCE_PROCESSING_LOCAL_COMPUTATIONAL_GRAPH_SOURCES
+        CONFIGURE_DEPENDS
+        ${SEQUENCE_PROCESSING_C_LOCAL_COMPUTATIONAL_GRAPH_ROOT}/src/*.c)
+add_library(sequence_processing_computational_graph STATIC ${SEQUENCE_PROCESSING_LOCAL_COMPUTATIONAL_GRAPH_SOURCES})
+target_include_directories(sequence_processing_computational_graph
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SEQUENCE_PROCESSING_C_LOCAL_COMPUTATIONAL_GRAPH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
+        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
+target_link_libraries(sequence_processing_computational_graph
+        PUBLIC
+        sequence_processing_math
+        sequence_processing_data_structure
+        m)
+
 add_library(SequenceProcessing
         Classification/BorrowedFunctionProxy.c
         Classification/BorrowedFunctionProxy.h
@@ -50,163 +162,48 @@ add_library(SequenceProcessing
 
 target_include_directories(SequenceProcessing
         PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
-
-find_package(util_c QUIET)
-find_package(math_c QUIET)
-find_package(dictionary_c QUIET)
-find_package(corpus_c QUIET)
-find_package(data_structure_c QUIET)
-find_package(regular_c QUIET)
-
+        ${SEQUENCE_PROCESSING_LOCAL_INCLUDE_DIRS})
 target_link_libraries(SequenceProcessing
-        PRIVATE
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:dictionary_c::dictionary_c>:dictionary_c::dictionary_c>
-        $<$<TARGET_EXISTS:corpus_c::corpus_c>:corpus_c::corpus_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>
-        $<$<TARGET_EXISTS:regular_c::regular_c>:regular_c::regular_c>)
+        PUBLIC
+        sequence_processing_computational_graph
+        sequence_processing_corpus
+        sequence_processing_dictionary
+        sequence_processing_math
+        sequence_processing_util
+        sequence_processing_data_structure
+        sequence_processing_regular
+        m)
 
-add_executable(SequenceCorpusTest
-        ../test/SequenceCorpusTest.c)
+function(sequence_processing_add_executable test_name test_source)
+    add_executable(${test_name} ${test_source})
+    target_include_directories(${test_name}
+            PRIVATE
+            ${SEQUENCE_PROCESSING_LOCAL_INCLUDE_DIRS})
+    target_link_libraries(${test_name}
+            PRIVATE
+            SequenceProcessing)
+endfunction()
 
-add_executable(ParameterSliceTest
-        ../test/ParameterSliceTest.c)
+function(sequence_processing_add_test test_name)
+    add_test(NAME ${test_name} COMMAND ${test_name})
+endfunction()
 
-add_executable(FunctionSliceTest
-        ../test/FunctionSliceTest.c)
+sequence_processing_add_executable(SequenceCorpusTest ../test/SequenceCorpusTest.c)
+sequence_processing_add_executable(ParameterSliceTest ../test/ParameterSliceTest.c)
+sequence_processing_add_executable(FunctionSliceTest ../test/FunctionSliceTest.c)
+sequence_processing_add_executable(RecurrentNeuralNetworkModelTest ../test/RecurrentNeuralNetworkModelTest.c)
+sequence_processing_add_executable(GatedRecurrentUnitModelTest ../test/GatedRecurrentUnitModelTest.c)
+sequence_processing_add_executable(LongShortTermMemoryModelTest ../test/LongShortTermMemoryModelTest.c)
+sequence_processing_add_executable(TransformerTest ../test/TransformerTest.c)
 
-add_executable(RecurrentNeuralNetworkModelTest
-        ../test/RecurrentNeuralNetworkModelTest.c)
+sequence_processing_add_test(SequenceCorpusTest)
+sequence_processing_add_test(ParameterSliceTest)
+sequence_processing_add_test(FunctionSliceTest)
+sequence_processing_add_test(RecurrentNeuralNetworkModelTest)
 
-add_executable(GatedRecurrentUnitModelTest
-        ../test/GatedRecurrentUnitModelTest.c)
-
-add_executable(LongShortTermMemoryModelTest
-        ../test/LongShortTermMemoryModelTest.c)
-
-add_executable(TransformerTest
-        ../test/TransformerTest.c)
-
-target_include_directories(SequenceCorpusTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_CORPUS_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src)
-
-target_link_libraries(SequenceCorpusTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:dictionary_c::dictionary_c>:dictionary_c::dictionary_c>
-        $<$<TARGET_EXISTS:corpus_c::corpus_c>:corpus_c::corpus_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>
-        $<$<TARGET_EXISTS:regular_c::regular_c>:regular_c::regular_c>)
-
-target_include_directories(ParameterSliceTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
-
-target_link_libraries(ParameterSliceTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
-
-target_include_directories(FunctionSliceTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
-
-target_link_libraries(FunctionSliceTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
-
-target_include_directories(RecurrentNeuralNetworkModelTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
-
-target_link_libraries(RecurrentNeuralNetworkModelTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
-
-target_include_directories(GatedRecurrentUnitModelTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
-
-target_link_libraries(GatedRecurrentUnitModelTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
-
-target_include_directories(LongShortTermMemoryModelTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
-
-target_link_libraries(LongShortTermMemoryModelTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
-
-target_include_directories(TransformerTest
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../ComputationalGraph-C/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DICTIONARY_ROOT}/src/Dictionary
-        ${SEQUENCE_PROCESSING_C_LOCAL_UTIL_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_DATA_STRUCTURE_ROOT}/src
-        ${SEQUENCE_PROCESSING_C_LOCAL_MATH_ROOT}/src)
-
-target_link_libraries(TransformerTest
-        PRIVATE
-        SequenceProcessing
-        $<$<TARGET_EXISTS:util_c::util_c>:util_c::util_c>
-        $<$<TARGET_EXISTS:math_c::math_c>:math_c::math_c>
-        $<$<TARGET_EXISTS:dictionary_c::dictionary_c>:dictionary_c::dictionary_c>
-        $<$<TARGET_EXISTS:data_structure_c::data_structure_c>:data_structure_c::data_structure_c>)
+# The model-layer binaries below still compile, but they are not registered in
+# ctest yet because their current runtime paths cross upstream sibling-library
+# bugs outside SequenceProcessing-C:
+# - GRU/LSTM hit ComputationalGraph-C concatenation execution corruption
+# - Transformer currently also depends on unresolved Dictionary-C cleanup
+#   behavior and the same staged graph-runtime boundary
