@@ -213,6 +213,42 @@ Array_list_ptr recurrent_neural_network_model_predict(Recurrent_neural_network_m
     return recurrent_model_graph_bridge_predict(model->graph_bridge);
 }
 
+Classification_performance_ptr recurrent_neural_network_model_test(Recurrent_neural_network_model_ptr model,
+                                                                   Array_list_ptr test_set) {
+    int count = 0;
+    int total = 0;
+    int instance_index;
+    if (model == NULL || test_set == NULL) {
+        return NULL;
+    }
+    for (instance_index = 0; instance_index < test_set->size; instance_index++) {
+        Tensor_ptr instance = array_list_get(test_set, instance_index);
+        Array_list_ptr gold_class_labels = recurrent_neural_network_model_create_input_tensors(model, instance);
+        Array_list_ptr class_labels;
+        int time_step;
+        int j;
+        if (gold_class_labels == NULL) {
+            return NULL;
+        }
+        class_labels = recurrent_neural_network_model_predict(model);
+        if (class_labels == NULL) {
+            free_array_list(gold_class_labels, free_);
+            return NULL;
+        }
+        time_step = instance->shape[0] / (model->word_embedding_length + 1);
+        for (j = 0; j < time_step; j++) {
+            if (j < gold_class_labels->size && j < class_labels->size &&
+                array_list_get_int(gold_class_labels, j) == (int) array_list_get_double(class_labels, j)) {
+                count++;
+            }
+            total++;
+        }
+        free_array_list(gold_class_labels, free_);
+        free_array_list(class_labels, free_);
+    }
+    return create_sequence_processing_classification_performance((count + 0.0) / total);
+}
+
 Multiplication_node_ptr recurrent_neural_network_model_create_weight_node(Recurrent_neural_network_model_ptr model,
                                                                           int row,
                                                                           int column,

@@ -125,6 +125,8 @@ add_library(SequenceProcessing
         Classification/RecurrentNeuralNetworkModel.h
         Classification/Transformer.c
         Classification/Transformer.h
+        Classification/TransformerTokenStore.c
+        Classification/TransformerTokenStore.h
         SequenceProcessing.c
         SequenceProcessing.h
         Functions/AdditionByConstant.c
@@ -153,6 +155,8 @@ add_library(SequenceProcessing
         Parameters/RecurrentNeuralNetworkParameter.h
         Parameters/TransformerParameter.c
         Parameters/TransformerParameter.h
+        Performance/ClassificationPerformance.c
+        Performance/ClassificationPerformance.h
         Sequence/LabelledSentence.c
         Sequence/LabelledSentence.h
         Sequence/SequenceCorpus.c

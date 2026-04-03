@@ -2,6 +2,7 @@
 #define SEQUENCE_PROCESSING_RECURRENT_NEURAL_NETWORK_MODEL_H
 
 #include "Parameters/RecurrentNeuralNetworkParameter.h"
+#include "Performance/ClassificationPerformance.h"
 #include "Tensor.h"
 
 #include <stdbool.h>
@@ -128,6 +129,19 @@ void recurrent_neural_network_model_set_output_node(Recurrent_neural_network_mod
 Array_list_ptr recurrent_neural_network_model_forward(Recurrent_neural_network_model_ptr model);
 
 Array_list_ptr recurrent_neural_network_model_predict(Recurrent_neural_network_model_ptr model);
+
+/*
+ * Java helper parity for test(ArrayList<Tensor> testSet) at the shared
+ * recurrent-base layer.
+ *
+ * Preconditions:
+ * - the recurrent graph must already be built
+ * - `predict()` must return one class index per active time step
+ *
+ * Returns an owned ClassificationPerformance object.
+ */
+Classification_performance_ptr recurrent_neural_network_model_test(Recurrent_neural_network_model_ptr model,
+                                                                   Array_list_ptr test_set);
 
 /*
  * Creates an owned learnable weight node using the Java initialization formula

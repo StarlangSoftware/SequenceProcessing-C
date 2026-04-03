@@ -1,14 +1,15 @@
 #include "Classification/Transformer.h"
+#include "Classification/TransformerTokenStore.h"
 
 #include "ArrayList.h"
-#include "Dictionary/Dictionary.h"
-#include "Dictionary/VectorizedDictionary.h"
-#include "Dictionary/VectorizedWord.h"
 #include "Initialization/Initialization.h"
 #include "Memory/Memory.h"
 #include "Node/ComputationalNode.h"
 #include "Optimizer/Optimizer.h"
 #include "Optimizer/StochasticGradientDescent.h"
+#include "Performance/ClassificationPerformance.h"
+#include "Functions/MultiplyByConstant.h"
+#include "Vector.h"
 
 #include <float.h>
 
@@ -53,8 +54,10 @@ static Transformer_parameter_ptr create_trainable_test_parameter(Optimizer_ptr o
     array_list_add_double(gamma_input, 1.0);
     array_list_add_double(gamma_output, 1.0);
     array_list_add_double(gamma_output, 1.0);
+    array_list_add_double(gamma_output, 1.0);
     array_list_add_double(beta_input, 0.0);
     array_list_add_double(beta_input, 0.0);
+    array_list_add_double(beta_output, 0.0);
     array_list_add_double(beta_output, 0.0);
     array_list_add_double(beta_output, 0.0);
     parameter = create_transformer_parameter(
@@ -84,27 +87,92 @@ static Transformer_parameter_ptr create_trainable_test_parameter(Optimizer_ptr o
     return parameter;
 }
 
-static Vectorized_dictionary_ptr create_test_dictionary(void) {
-    Vectorized_dictionary_ptr dictionary = create_vectorized_dictionary();
-    add_word((Dictionary_ptr) dictionary, (Word_ptr) create_vectorized_word("hello", create_vector2(2, 0.0)));
-    add_word((Dictionary_ptr) dictionary, (Word_ptr) create_vectorized_word("<S>", create_vector2(2, 0.0)));
-    add_word((Dictionary_ptr) dictionary, (Word_ptr) create_vectorized_word("</S>", create_vector2(2, 0.0)));
-    sort((Dictionary_ptr) dictionary);
-    return dictionary;
+static Transformer_token_store_ptr create_test_token_store(void) {
+    Transformer_token_store_ptr token_store = create_transformer_token_store();
+    double hello_values[2] = {0.1, 0.2};
+    double start_values[2] = {0.3, 0.4};
+    double end_values[2] = {0.5, 0.6};
+    Vector_ptr hello_vector;
+    Vector_ptr start_vector;
+    Vector_ptr end_vector;
+    if (token_store == NULL) {
+        return NULL;
+    }
+    hello_vector = create_vector4(hello_values, 2);
+    start_vector = create_vector4(start_values, 2);
+    end_vector = create_vector4(end_values, 2);
+    if (!transformer_token_store_add(token_store, "hello", hello_vector) ||
+        !transformer_token_store_add(token_store, "<S>", start_vector) ||
+        !transformer_token_store_add(token_store, "</S>", end_vector)) {
+        free_vector(hello_vector);
+        free_vector(start_vector);
+        free_vector(end_vector);
+        free_transformer_token_store(token_store);
+        return NULL;
+    }
+    free_vector(hello_vector);
+    free_vector(start_vector);
+    free_vector(end_vector);
+    transformer_token_store_sort(token_store);
+    return token_store;
+}
+
+static Transformer_token_store_ptr create_feedback_token_store(void) {
+    Transformer_token_store_ptr token_store = create_transformer_token_store();
+    double hello_values[3] = {1.2, 0.1, 0.2};
+    double start_values[3] = {0.1, 0.2, 1.4};
+    double end_values[3] = {1.5, 0.1, 0.1};
+    Vector_ptr hello_vector;
+    Vector_ptr start_vector;
+    Vector_ptr end_vector;
+    if (token_store == NULL) {
+        return NULL;
+    }
+    hello_vector = create_vector4(hello_values, 3);
+    start_vector = create_vector4(start_values, 3);
+    end_vector = create_vector4(end_values, 3);
+    if (!transformer_token_store_add(token_store, "hello", hello_vector) ||
+        !transformer_token_store_add(token_store, "<S>", start_vector) ||
+        !transformer_token_store_add(token_store, "</S>", end_vector)) {
+        free_vector(hello_vector);
+        free_vector(start_vector);
+        free_vector(end_vector);
+        free_transformer_token_store(token_store);
+        return NULL;
+    }
+    free_vector(hello_vector);
+    free_vector(start_vector);
+    free_vector(end_vector);
+    transformer_token_store_sort(token_store);
+    return token_store;
+}
+
+static int test_transformer_token_store_vectors(void) {
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    int start_index = transformer_token_store_find_index(token_store, "<S>");
+    const Vector* start_vector = transformer_token_store_get_vector(token_store, start_index);
+    int success = token_store != NULL &&
+                  transformer_token_store_get_embedding_size(token_store) == 2 &&
+                  start_index >= 0 &&
+                  start_vector != NULL &&
+                  get_value(start_vector, 0) == 0.3 &&
+                  get_value(start_vector, 1) == 0.4;
+    free_transformer_token_store(token_store);
+    return success;
 }
 
 static int test_transformer_constructor_scans_start_and_end_tokens(void) {
     Transformer_parameter_ptr parameter = create_test_parameter();
     Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     int success = model != NULL &&
-                  transformer_model_get_dictionary(model) == dictionary &&
-                  transformer_model_get_start_index(model) == get_word_index((Dictionary_ptr) dictionary, "<S>") &&
-                  transformer_model_get_end_index(model) == get_word_index((Dictionary_ptr) dictionary, "</S>");
+                  transformer_model_get_token_store(model) == token_store &&
+                  transformer_model_get_start_index(model) == transformer_token_store_find_index(token_store, "<S>") &&
+                  transformer_model_get_end_index(model) == transformer_token_store_find_index(token_store, "</S>");
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_(optimizer);
     return success;
 }
@@ -118,14 +186,14 @@ static int test_transformer_constructor_handles_missing_tokens(void) {
             13, 2, optimizer, Random, NULL, 4, 2, 8, 1e-8,
             empty_ints, empty_ints, empty_functions, empty_functions,
             empty_doubles, empty_doubles, empty_doubles, empty_doubles);
-    Vectorized_dictionary_ptr dictionary = create_vectorized_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_transformer_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     int success = model != NULL &&
                   transformer_model_get_start_index(model) == -1 &&
                   transformer_model_get_end_index(model) == -1;
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_array_list(empty_ints, free_);
     free_array_list(empty_functions, NULL);
     free_array_list(empty_doubles, free_);
@@ -136,8 +204,8 @@ static int test_transformer_constructor_handles_missing_tokens(void) {
 static int test_transformer_positional_encoding_helper(void) {
     Transformer_parameter_ptr parameter = create_test_parameter();
     Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     double* values = malloc_(4 * sizeof(double));
     int shape[2] = {2, 2};
     Tensor_ptr tensor;
@@ -159,7 +227,7 @@ static int test_transformer_positional_encoding_helper(void) {
     free_tensor(tensor);
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_(optimizer);
     return success;
 }
@@ -167,8 +235,8 @@ static int test_transformer_positional_encoding_helper(void) {
 static int test_transformer_create_packed_inputs_helper(void) {
     Transformer_parameter_ptr parameter = create_test_parameter();
     Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     double* values = malloc_(11 * sizeof(double));
     int shape[1] = {11};
     Tensor_ptr instance;
@@ -208,7 +276,7 @@ static int test_transformer_create_packed_inputs_helper(void) {
     free_tensor(instance);
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_(optimizer);
     return success;
 }
@@ -216,8 +284,8 @@ static int test_transformer_create_packed_inputs_helper(void) {
 static int test_transformer_graph_input_initialization_and_apply(void) {
     Transformer_parameter_ptr parameter = create_test_parameter();
     Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     double* values = malloc_(11 * sizeof(double));
     int shape[1] = {11};
     Tensor_ptr instance;
@@ -259,7 +327,7 @@ static int test_transformer_graph_input_initialization_and_apply(void) {
     free_tensor(instance);
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_(optimizer);
     return success;
 }
@@ -267,8 +335,8 @@ static int test_transformer_graph_input_initialization_and_apply(void) {
 static int test_transformer_set_input_node_and_class_label_slot(void) {
     Transformer_parameter_ptr parameter = create_test_parameter();
     Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     Array_list_ptr input_nodes;
     Computational_node_ptr decoder_input;
     Computational_node_ptr class_label_input;
@@ -295,7 +363,7 @@ static int test_transformer_set_input_node_and_class_label_slot(void) {
     free_vector(second_vector);
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_(optimizer);
     return success;
 }
@@ -303,8 +371,8 @@ static int test_transformer_set_input_node_and_class_label_slot(void) {
 static int test_transformer_build_graph_stage(void) {
     Optimizer_ptr optimizer = create_stochastic_gradient(0.1, 0.5);
     Transformer_parameter_ptr parameter = create_trainable_test_parameter(optimizer);
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     Array_list_ptr input_nodes;
     /*
      * This validates only the staged local graph shell: graph claim plus the
@@ -319,7 +387,7 @@ static int test_transformer_build_graph_stage(void) {
               input_nodes->size == 3;
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
     free_(optimizer);
     return success;
 }
@@ -327,8 +395,8 @@ static int test_transformer_build_graph_stage(void) {
 static int test_transformer_train_stage(void) {
     Optimizer_ptr optimizer = create_stochastic_gradient(0.1, 0.5);
     Transformer_parameter_ptr parameter = create_trainable_test_parameter(optimizer);
-    Vectorized_dictionary_ptr dictionary = create_test_dictionary();
-    Transformer_model_ptr model = create_transformer_model(parameter, dictionary);
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
     Array_list_ptr train_set = create_array_list();
     double* values = malloc_(9 * sizeof(double));
     int shape[1] = {9};
@@ -358,12 +426,117 @@ static int test_transformer_train_stage(void) {
     free_array_list(train_set, (void (*)(void*)) free_tensor);
     free_transformer_model(model);
     free_transformer_parameter(parameter);
-    free_vectorized_dictionary(dictionary);
+    free_transformer_token_store(token_store);
+    free_(optimizer);
+    return success;
+}
+
+static int test_transformer_test_parity(void) {
+    Transformer_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Transformer_token_store_ptr token_store = create_test_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
+    Array_list_ptr test_set = create_array_list();
+    Array_list_ptr input_nodes;
+    Computational_node_ptr decoder_input;
+    Computational_node_ptr output_node;
+    Classification_performance_ptr performance;
+    double* values = malloc_(6 * sizeof(double));
+    int shape[1] = {6};
+    Tensor_ptr instance = create_tensor3(values, shape, 1);
+    int success;
+    values[0] = 1.0;
+    values[1] = 2.0;
+    values[2] = DBL_MAX;
+    values[3] = 5.0;
+    values[4] = 6.0;
+    values[5] = 0.0;
+    success = transformer_model_initialize_graph_inputs(model);
+    input_nodes = transformer_model_get_input_nodes(model);
+    decoder_input = success ? array_list_get(input_nodes, 1) : NULL;
+    output_node = (decoder_input != NULL)
+                  ? transformer_model_add_edge(model, decoder_input, (Function*) create_multiply_by_constant(1.0), false)
+                  : NULL;
+    transformer_model_set_output_node(model, output_node);
+    array_list_add(test_set, instance);
+    performance = transformer_model_test(model, test_set);
+    success = success &&
+              output_node != NULL &&
+              performance != NULL &&
+              sequence_processing_classification_performance_get_accuracy(performance) == 1.0;
+    free_sequence_processing_classification_performance(performance);
+    free_array_list(test_set, (void (*)(void*)) free_tensor);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_transformer_token_store(token_store);
+    free_(optimizer);
+    return success;
+}
+
+static int test_transformer_test_decoder_feedback_loop(void) {
+    Array_list_ptr empty_ints = create_array_list();
+    Array_list_ptr empty_functions = create_array_list();
+    Array_list_ptr empty_doubles = create_array_list();
+    Optimizer_ptr optimizer = create_optimizer(0.1, 1.0);
+    Transformer_parameter_ptr parameter = create_transformer_parameter(
+            13, 2, optimizer, Random, NULL, 3, 1, 3, 1e-8,
+            empty_ints, empty_ints, empty_functions, empty_functions,
+            empty_doubles, empty_doubles, empty_doubles, empty_doubles);
+    Transformer_token_store_ptr token_store = create_feedback_token_store();
+    Transformer_model_ptr model = create_transformer_model(parameter, token_store);
+    Array_list_ptr test_set = create_array_list();
+    Array_list_ptr input_nodes;
+    Computational_node_ptr decoder_input;
+    Computational_node_ptr output_node;
+    Classification_performance_ptr performance;
+    double* values = malloc_(12 * sizeof(double));
+    int shape[1] = {12};
+    Tensor_ptr instance = create_tensor3(values, shape, 1);
+    int success;
+
+    values[0] = 0.2;
+    values[1] = 0.3;
+    values[2] = 0.4;
+    values[3] = DBL_MAX;
+    values[4] = 0.6;
+    values[5] = 0.5;
+    values[6] = 0.4;
+    values[7] = 2.0;
+    values[8] = 0.3;
+    values[9] = 0.2;
+    values[10] = 0.1;
+    values[11] = 0.0;
+
+    success = transformer_model_initialize_graph_inputs(model);
+    input_nodes = transformer_model_get_input_nodes(model);
+    decoder_input = success ? array_list_get(input_nodes, 1) : NULL;
+    output_node = (decoder_input != NULL)
+                  ? transformer_model_add_edge(model, decoder_input, (Function*) create_multiply_by_constant(1.0), false)
+                  : NULL;
+    transformer_model_set_output_node(model, output_node);
+    array_list_add(test_set, instance);
+    performance = transformer_model_test(model, test_set);
+    success = success &&
+              output_node != NULL &&
+              performance != NULL &&
+              sequence_processing_classification_performance_get_accuracy(performance) == 1.0;
+
+    free_sequence_processing_classification_performance(performance);
+    free_array_list(test_set, (void (*)(void*)) free_tensor);
+    free_transformer_model(model);
+    free_transformer_parameter(parameter);
+    free_transformer_token_store(token_store);
+    free_array_list(empty_ints, free_);
+    free_array_list(empty_functions, NULL);
+    free_array_list(empty_doubles, free_);
     free_(optimizer);
     return success;
 }
 
 int main(void) {
+    if (!test_transformer_token_store_vectors()) {
+        return 1;
+    }
     if (!test_transformer_constructor_scans_start_and_end_tokens()) {
         return 1;
     }
@@ -386,6 +559,12 @@ int main(void) {
         return 1;
     }
     if (!test_transformer_train_stage()) {
+        return 1;
+    }
+    if (!test_transformer_test_parity()) {
+        return 1;
+    }
+    if (!test_transformer_test_decoder_feedback_loop()) {
         return 1;
     }
     return 0;

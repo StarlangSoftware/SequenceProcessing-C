@@ -22,33 +22,47 @@ configuration path.
 
 ## Local Compatibility Notes
 
-- `src/Performance/ClassificationPerformance.h` is a minimal local compatibility
-  declaration so `ComputationalGraph-C` public headers compile without
-  `Classification-C` in this workspace.
-- `SequenceProcessing-C` does not implement `ClassificationPerformance`
-  behavior locally.
+- `src/Performance/ClassificationPerformance.h` remains a minimal local
+  compatibility declaration for `SequenceProcessing-C`'s own local build path.
+- Current `Transformer` token/vector lookup does not rely on `Dictionary-C`.
+  It uses the local
+  [TransformerTokenStore](/home/cengiz/dev/ozu/SequenceProcessing-C/src/Classification/TransformerTokenStore.h)
+  helper for the current constructor, token-scan, and `test(...)` surface.
+- `Dictionary-C` is still present in the broader workspace build because other
+  ported files include it, but it is not required for the current local
+  Transformer token/vector slice.
 - Feature macros `_DEFAULT_SOURCE` and `_POSIX_C_SOURCE=200809L` are enabled so
   libc APIs such as `strtok_r`, `mkstemp`, `fdopen`, `random`, and `srandom`
   are declared during real builds.
 
 ## Test Status
 
-Currently runnable in local manual builds:
+Current standalone local verification:
 
 - `SequenceCorpusTest`
 - `ParameterSliceTest`
 - `FunctionSliceTest`
 - `RecurrentNeuralNetworkModelTest`
-
-Currently compile-only in this repo:
-
 - `GatedRecurrentUnitModelTest`
 - `LongShortTermMemoryModelTest`
 - `TransformerTest`
 
-Those model-layer tests are intentionally not registered with `ctest` yet
-because their runtime paths still cross upstream sibling-library issues outside
-`SequenceProcessing-C`.
+All of the above currently pass:
+
+- in normal standalone local builds
+- in ASAN standalone local builds with `ASAN_OPTIONS=detect_leaks=0`
+
+Qualified limits at this checkpoint:
+
+- this is a verified staged checkpoint, not a claim of full Java parity
+- recurrent and Transformer training currently use the grounded class-index
+  backprop path
+- `Transformer` remains a staged port even though the current local
+  `test(...)` path is implemented
+- full Java parity across all model behavior is not claimed
+- full sibling-stack integration parity is not claimed
+- ASAN coverage in this checkpoint used `detect_leaks=0`, so leak-cleanliness is
+  not claimed here
 
 See [PORT_STATUS.md](/home/cengiz/dev/ozu/SequenceProcessing-C/PORT_STATUS.md)
 for the current port and blocker summary.

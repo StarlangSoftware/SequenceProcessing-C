@@ -7,6 +7,7 @@
 #include "Memory/Memory.h"
 #include "Node/ComputationalNode.h"
 #include "Optimizer/Optimizer.h"
+#include "Performance/ClassificationPerformance.h"
 
 static Tensor_ptr create_test_sequence_instance_1d(double a, double b, double c,
                                                    double d, double e, double f) {
@@ -154,6 +155,39 @@ static int test_local_graph_bridge_wrappers(void) {
     return success;
 }
 
+static int test_recurrent_test_parity(void) {
+    Recurrent_neural_network_parameter_ptr parameter = create_test_parameter();
+    Optimizer_ptr optimizer = parameter->neural_network_parameter.optimizer;
+    Recurrent_neural_network_model_ptr model = create_recurrent_neural_network_model(parameter, 2);
+    Array_list_ptr test_set = create_array_list();
+    Tensor_ptr instance = create_test_sequence_instance_1d(1.0, 2.0, 1.0, 3.0, 4.0, 1.0);
+    Array_list_ptr nodes = create_array_list();
+    Computational_node_ptr input0;
+    Computational_node_ptr input1;
+    Classification_performance_ptr performance;
+    Concatenated_node_ptr output_node;
+    int success;
+    input0 = recurrent_neural_network_model_add_time_step_input(model);
+    input1 = recurrent_neural_network_model_add_time_step_input(model);
+    recurrent_neural_network_model_add_class_label_input(model);
+    array_list_add(nodes, input0);
+    array_list_add(nodes, input1);
+    output_node = recurrent_neural_network_model_concat_edges(model, nodes, 0);
+    recurrent_neural_network_model_set_output_node(model, (Computational_node_ptr) output_node);
+    model->graph_initialized = true;
+    array_list_add(test_set, instance);
+    performance = recurrent_neural_network_model_test(model, test_set);
+    success = performance != NULL &&
+              sequence_processing_classification_performance_get_accuracy(performance) == 1.0;
+    free_sequence_processing_classification_performance(performance);
+    free_array_list(nodes, NULL);
+    free_array_list(test_set, (void (*)(void*)) free_tensor);
+    free_recurrent_neural_network_model(model);
+    free_recurrent_neural_network_parameter(parameter);
+    free_(optimizer);
+    return success;
+}
+
 int main(void) {
     if (!test_create_input_tensors()) {
         return 1;
@@ -165,6 +199,9 @@ int main(void) {
         return 1;
     }
     if (!test_local_graph_bridge_wrappers()) {
+        return 1;
+    }
+    if (!test_recurrent_test_parity()) {
         return 1;
     }
     return 0;

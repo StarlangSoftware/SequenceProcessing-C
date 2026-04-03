@@ -1,6 +1,7 @@
 #ifndef SEQUENCE_PROCESSING_TRANSFORMER_H
 #define SEQUENCE_PROCESSING_TRANSFORMER_H
 
+#include "Performance/ClassificationPerformance.h"
 #include "Parameters/TransformerParameter.h"
 #include "Tensor.h"
 
@@ -10,8 +11,8 @@ typedef Array_list* Array_list_ptr;
 typedef struct computational_node Computational_node;
 typedef Computational_node* Computational_node_ptr;
 
-typedef struct vectorized_dictionary Vectorized_dictionary;
-typedef Vectorized_dictionary* Vectorized_dictionary_ptr;
+typedef struct transformer_token_store Transformer_token_store;
+typedef Transformer_token_store* Transformer_token_store_ptr;
 
 typedef struct vector Vector;
 typedef Vector* Vector_ptr;
@@ -31,11 +32,11 @@ typedef Transformer_packed_inputs* Transformer_packed_inputs_ptr;
  * - owned: Transformer shell struct and its local graph bridge
  */
 Transformer_model_ptr create_transformer_model(Transformer_parameter_ptr parameters,
-                                               Vectorized_dictionary_ptr dictionary);
+                                               Transformer_token_store_ptr token_store);
 
 void free_transformer_model(Transformer_model_ptr model);
 
-Vectorized_dictionary_ptr transformer_model_get_dictionary(const Transformer_model* model);
+Transformer_token_store_ptr transformer_model_get_token_store(const Transformer_model* model);
 
 int transformer_model_get_start_index(const Transformer_model* model);
 
@@ -136,6 +137,18 @@ Computational_node_ptr transformer_model_add_class_label_input(Transformer_model
  */
 Array_list_ptr transformer_model_get_output_value(const Computational_node* output_node);
 
+Computational_node_ptr transformer_model_add_edge(Transformer_model_ptr model,
+                                                  Computational_node_ptr first,
+                                                  Function* function,
+                                                  bool is_biased);
+
+/*
+ * Local output-node setter used by the staged Transformer graph shell and
+ * narrow test-path coverage.
+ */
+void transformer_model_set_output_node(Transformer_model_ptr model,
+                                       Computational_node_ptr output_node);
+
 /*
  * Builds the staged Transformer graph shell/body corresponding to the current
  * Java train(...) graph construction, but without claiming multi-input loss
@@ -152,5 +165,14 @@ bool transformer_model_build_graph(Transformer_model_ptr model);
  * and it reuses the already-built graph on later calls instead of rebuilding it.
  */
 bool transformer_model_train(Transformer_model_ptr model, Array_list_ptr train_set);
+
+/*
+ * Java test(...) parity for the current local Transformer slice.
+ *
+ * This uses token-store embedding vectors for autoregressive decoder feedback
+ * and returns a local ClassificationPerformance result.
+ */
+Classification_performance_ptr transformer_model_test(Transformer_model_ptr model,
+                                                      Array_list_ptr test_set);
 
 #endif

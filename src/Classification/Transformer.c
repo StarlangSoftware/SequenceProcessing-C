@@ -2,9 +2,6 @@
 
 #include "ArrayList.h"
 #include "BorrowedFunctionProxy.h"
-#include "Dictionary/Dictionary.h"
-#include "Dictionary/VectorizedDictionary.h"
-#include "Dictionary/VectorizedWord.h"
 #include "Function/Negation.h"
 #include "Function/SoftMax.h"
 #include "JavaRandomCompat.h"
@@ -19,6 +16,7 @@
 #include "Functions/SquareRoot.h"
 #include "Functions/Transpose.h"
 #include "Functions/Variance.h"
+#include "TransformerTokenStore.h"
 #include "Vector.h"
 #include "Optimizer/Optimizer.h"
 
@@ -35,7 +33,7 @@ struct transformer_model {
     /*
      * Borrowed dictionary reference, matching the Java constructor field.
      */
-    Vectorized_dictionary_ptr dictionary;
+    Transformer_token_store_ptr token_store;
 
     /*
      * Owned local graph bridge reused for staged Transformer input/output and
@@ -69,18 +67,8 @@ struct transformer_packed_inputs {
     Array_list_ptr class_labels;
 };
 
-static int find_token_index(const Vectorized_dictionary* dictionary, const char* token) {
-    int i;
-    if (dictionary == NULL || token == NULL) {
-        return -1;
-    }
-    for (i = 0; i < size((const Dictionary*) dictionary); i++) {
-        const Vectorized_word* word = get_word_with_index((const Dictionary*) dictionary, i);
-        if (word != NULL && word->word.name != NULL && strcmp(word->word.name, token) == 0) {
-            return i;
-        }
-    }
-    return -1;
+static int find_token_index(const Transformer_token_store* token_store, const char* token) {
+    return transformer_token_store_find_index(token_store, token);
 }
 
 static Array_list_ptr transformer_output_extractor(const Computational_node* output_node) {
@@ -473,17 +461,17 @@ static bool shuffle_train_set_like_java(Array_list_ptr train_set, Java_random_co
 }
 
 Transformer_model_ptr create_transformer_model(Transformer_parameter_ptr parameters,
-                                               Vectorized_dictionary_ptr dictionary) {
+                                               Transformer_token_store_ptr token_store) {
     Transformer_model_ptr result = malloc_(sizeof(Transformer_model));
     if (result == NULL) {
         return NULL;
     }
     result->parameters = parameters;
-    result->dictionary = dictionary;
+    result->token_store = token_store;
     result->graph_bridge = create_recurrent_model_graph_bridge(transformer_output_extractor);
     result->input_nodes = recurrent_model_graph_bridge_get_input_nodes(result->graph_bridge);
-    result->start_index = find_token_index(dictionary, "<S>");
-    result->end_index = find_token_index(dictionary, "</S>");
+    result->start_index = find_token_index(token_store, "<S>");
+    result->end_index = find_token_index(token_store, "</S>");
     result->graph_initialized = false;
     if (result->graph_bridge == NULL || result->input_nodes == NULL) {
         if (result->graph_bridge != NULL) {
@@ -505,11 +493,11 @@ void free_transformer_model(Transformer_model_ptr model) {
     free_(model);
 }
 
-Vectorized_dictionary_ptr transformer_model_get_dictionary(const Transformer_model* model) {
+Transformer_token_store_ptr transformer_model_get_token_store(const Transformer_model* model) {
     if (model == NULL) {
         return NULL;
     }
-    return model->dictionary;
+    return model->token_store;
 }
 
 int transformer_model_get_start_index(const Transformer_model* model) {
@@ -827,6 +815,24 @@ Array_list_ptr transformer_model_get_output_value(const Computational_node* outp
     return class_labels;
 }
 
+Computational_node_ptr transformer_model_add_edge(Transformer_model_ptr model,
+                                                  Computational_node_ptr first,
+                                                  Function* function,
+                                                  bool is_biased) {
+    if (model == NULL || model->graph_bridge == NULL || first == NULL || function == NULL) {
+        return NULL;
+    }
+    return add_owned_function_edge(model, first, function, is_biased);
+}
+
+void transformer_model_set_output_node(Transformer_model_ptr model,
+                                       Computational_node_ptr output_node) {
+    if (model == NULL || model->graph_bridge == NULL || output_node == NULL) {
+        return;
+    }
+    recurrent_model_graph_bridge_set_output_node(model->graph_bridge, output_node);
+}
+
 bool transformer_model_build_graph(Transformer_model_ptr model) {
     Transformer_parameter_ptr parameter;
     Java_random_compat_ptr random;
@@ -1099,4 +1105,91 @@ bool transformer_model_train(Transformer_model_ptr model, Array_list_ptr train_s
     }
     free_java_random_compat(random);
     return true;
+}
+
+Classification_performance_ptr transformer_model_test(Transformer_model_ptr model, Array_list_ptr test_set) {
+    Computational_node_ptr encoder_input;
+    Computational_node_ptr decoder_input;
+    Computational_node_ptr decoder_state;
+    int embedding_size;
+    int count = 0;
+    int total = 0;
+    int instance_index;
+    if (model == NULL || test_set == NULL || model->graph_bridge == NULL ||
+        model->input_nodes == NULL || model->input_nodes->size < 2 ||
+        model->token_store == NULL || model->start_index < 0 || model->end_index < 0) {
+        return NULL;
+    }
+    embedding_size = transformer_token_store_get_embedding_size(model->token_store);
+    if (embedding_size <= 0) {
+        return NULL;
+    }
+    encoder_input = array_list_get(model->input_nodes, 0);
+    decoder_input = array_list_get(model->input_nodes, 1);
+    if (encoder_input == NULL || decoder_input == NULL) {
+        return NULL;
+    }
+    decoder_state = create_computational_node3(false, false);
+    if (decoder_state == NULL) {
+        return NULL;
+    }
+    for (instance_index = 0; instance_index < test_set->size; instance_index++) {
+        Tensor_ptr instance = array_list_get(test_set, instance_index);
+        Transformer_packed_inputs_ptr packed_inputs =
+                transformer_model_create_packed_inputs(model, instance, embedding_size);
+        Array_list_ptr gold_class_labels;
+        Array_list_ptr class_labels = NULL;
+        int current_word_index = model->start_index;
+        int j = 1;
+        int prediction_size = 0;
+        if (packed_inputs == NULL) {
+            return NULL;
+        }
+        gold_class_labels = transformer_packed_inputs_get_class_labels(packed_inputs);
+        if (gold_class_labels == NULL || transformer_packed_inputs_get_encoder_input(packed_inputs) == NULL) {
+            free_transformer_packed_inputs(packed_inputs);
+            return NULL;
+        }
+        set_node_value(encoder_input, clone_tensor(transformer_packed_inputs_get_encoder_input(packed_inputs)));
+        set_node_value(decoder_input, NULL);
+        set_node_value(decoder_state, NULL);
+        do {
+            const Vector* current_vector = transformer_token_store_get_vector(model->token_store, current_word_index);
+            int predicted_label;
+            if (current_vector == NULL ||
+                !transformer_model_set_input_node(model, j, current_vector, decoder_state) ||
+                decoder_state->value == NULL) {
+                free_transformer_packed_inputs(packed_inputs);
+                free_computational_node(decoder_state);
+                return NULL;
+            }
+            set_node_value(decoder_input, clone_tensor(decoder_state->value));
+            class_labels = recurrent_model_graph_bridge_predict(model->graph_bridge);
+            if (class_labels == NULL || class_labels->size == 0) {
+                if (class_labels != NULL) {
+                    free_array_list(class_labels, free_);
+                }
+                free_transformer_packed_inputs(packed_inputs);
+                free_computational_node(decoder_state);
+                return NULL;
+            }
+            prediction_size = class_labels->size;
+            predicted_label = (int) array_list_get_double(class_labels, prediction_size - 1);
+            if (gold_class_labels->size >= prediction_size &&
+                predicted_label == array_list_get_int(gold_class_labels, prediction_size - 1)) {
+                count++;
+            }
+            total++;
+            j++;
+            current_word_index = predicted_label;
+            free_array_list(class_labels, free_);
+            class_labels = NULL;
+        } while (current_word_index != model->end_index);
+        if (prediction_size < gold_class_labels->size) {
+            total += gold_class_labels->size - prediction_size;
+        }
+        free_transformer_packed_inputs(packed_inputs);
+    }
+    free_computational_node(decoder_state);
+    return create_sequence_processing_classification_performance((count + 0.0) / total);
 }
